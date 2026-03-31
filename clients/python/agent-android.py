@@ -188,7 +188,7 @@ class AgentAndroidClient:
     # ---------------------------------------------------------------------------
 
     def _api_call(self, template: Dict) -> Optional[Dict]:
-        """发送 API 请求"""
+        """Send an API request."""
         try:
             data = json.dumps(template, ensure_ascii=False).encode('utf-8')
             req = urllib.request.Request(
@@ -210,7 +210,7 @@ class AgentAndroidClient:
             return None
 
     def _get_raw(self, path: str, params: Dict = None) -> Optional[Dict]:
-        """GET 请求（用于 /health /screenshot /download 等端点）"""
+        """Send a GET request for endpoints such as /health, /screenshot, and /download."""
         url = self.base_url + path
         if params:
             url += '?' + urllib.parse.urlencode(params)
@@ -334,7 +334,7 @@ class AgentAndroidClient:
         return -1
 
     def _get_xpath_match_count(self, xpath: str) -> Optional[int]:
-        """使用 Android 运行时 evaluator 统计 XPath 匹配数量。"""
+        """Use the Android runtime evaluator to count XPath matches."""
         result = self._execute_template(
             template_id="xpath-validate-count",
             output_names=["matchCount"],
@@ -366,7 +366,7 @@ class AgentAndroidClient:
         return self._parse_match_count(outputs.get("matchCount"))
 
     def _describe_unique_xpath_match(self, xpath: str) -> Dict[str, Any]:
-        """当 XPath 唯一匹配时，读取首个元素的几个关键属性。"""
+        """When an XPath is unique, read a few key attributes from the first match."""
         result = self._execute_template(
             template_id="xpath-describe-unique",
             output_names=["textValue", "contentDescriptionValue", "classNameValue", "boundsValue"],
@@ -418,7 +418,7 @@ class AgentAndroidClient:
         }
 
     def validate_xpath_runtime(self, xpath: str) -> Optional[Dict[str, Any]]:
-        """用 Android 运行时 evaluator 校验 XPath，并在唯一匹配时返回摘要。"""
+        """Validate an XPath in the Android runtime and return a summary for unique matches."""
         count = self._get_xpath_match_count(xpath)
         if count is None:
             return None
@@ -432,7 +432,7 @@ class AgentAndroidClient:
         return info
 
     def get_ui_tree_xml(self, force_refresh: bool = False) -> Optional[str]:
-        """获取完整无障碍 UI tree XML。"""
+        """Return the full accessibility UI tree XML."""
         if not force_refresh and self._ui_tree_xml_cache is not None:
             return self._ui_tree_xml_cache
 
@@ -517,8 +517,9 @@ class AgentAndroidClient:
                          timeout: int = 30, interval: float = 1.0
                          ) -> Optional[Dict]:
         """
-        轮询 ARIA 树直到找到目标元素或超时。
-        返回找到的元素 Dict，找不到返回 None。
+        Poll the UI tree until the target element is found or the timeout expires.
+
+        Returns the matching element dict, or `None` if nothing is found.
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -546,7 +547,7 @@ class AgentAndroidClient:
     # ---------------------------------------------------------------------------
 
     def tap_element(self, refId: int) -> bool:
-        """点击指定 refId 的元素（复用本地缓存的树）"""
+        """Tap the element for the given refId using the cached tree when available."""
         target = self._find_element_by_refId(refId)
         if not target:
             return False
@@ -568,7 +569,7 @@ class AgentAndroidClient:
     # ---------------------------------------------------------------------------
 
     def input_to_element(self, refId: int, text: str, clearFirst: bool = True) -> bool:
-        """向指定 refId 的元素输入文本（复用本地缓存的树）"""
+        """Input text into the given refId using the cached tree when available."""
         target = self._find_element_by_refId(refId)
         if not target:
             return False
@@ -600,10 +601,11 @@ class AgentAndroidClient:
     def swipe(self, direction: str = "down", duration: int = 300,
               distance: float = 0.5) -> bool:
         """
-        执行滑动手势。
+        Execute a swipe gesture.
+
         direction: up / down / left / right
-        duration:  滑动持续时间（毫秒）
-        distance:  滑动距离占屏幕比例（0.0-1.0）
+        duration: swipe duration in milliseconds
+        distance: swipe distance as a screen ratio (0.0-1.0)
         """
         d = direction.lower()
         if d not in ('up', 'down', 'left', 'right'):
@@ -629,8 +631,9 @@ class AgentAndroidClient:
     def screenshot(self, output_path: str = None,
                    quality: int = 80) -> Optional[str]:
         """
-        执行截图并下载到本地。
-        返回本地保存的文件路径，失败返回 None。
+        Capture a screenshot and download it locally.
+
+        Returns the saved local file path, or `None` on failure.
         """
         print(f"Capturing screenshot (quality={quality})...", file=sys.stderr)
         data = self._get_raw("/screenshot", {"quality": str(quality)})
@@ -666,7 +669,7 @@ class AgentAndroidClient:
         return output_path
 
     def _screenshot_via_template(self, output_path: str = None, quality: int = 80) -> Optional[str]:
-        """降级方案：通过模板 API 截图，然后下载文件"""
+        """Fallback path: capture a screenshot through the template API and then download it."""
         if not output_path:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             output_path = f"screenshot_{timestamp}.png"
@@ -705,7 +708,7 @@ class AgentAndroidClient:
         return output_path
 
     def _get_package_name(self) -> Optional[str]:
-        """获取当前前台 App 包名"""
+        """Return the current foreground app package name."""
         template = {
             "templateId": "current-app",
             "operations": [
@@ -719,7 +722,7 @@ class AgentAndroidClient:
         return None
 
     def _get_package_name_from_dump_tree(self) -> Optional[str]:
-        """通过 dumpTree(json) 根节点获取当前前台包名。"""
+        """Read the current foreground package name from the dumpTree(json) root node."""
         result = self._execute_template(
             template_id="ui-tree-package-probe",
             output_names=["uiTreeJson"],
@@ -746,7 +749,7 @@ class AgentAndroidClient:
         return package_name if isinstance(package_name, str) and package_name.strip() else None
 
     def get_current_package_name(self) -> Optional[str]:
-        """公开当前前台包名查询，供列表/诊断输出使用。"""
+        """Public helper for querying the current foreground package name for listing and diagnostics."""
         package_name = self._get_package_name()
         if not package_name:
             package_name = self._get_package_name_from_dump_tree()
@@ -760,7 +763,8 @@ class AgentAndroidClient:
 
     def press_key(self, key: str) -> bool:
         """
-        按下指定按键。
+        Press a supported system key.
+
         key: back / home / menu / enter / delete
         """
         key_map = {
@@ -801,8 +805,9 @@ class AgentAndroidClient:
 
     def get_attribute(self, refId: int, attribute: str) -> Optional[str]:
         """
-        获取 refId 对应元素的指定属性值。
-        attribute: text / content-desc / className / resourceId / bounds 等
+        Return the requested attribute for the element identified by refId.
+
+        attribute: text / content-desc / className / resourceId / bounds / ...
         """
         target = self._find_element_by_refId(refId)
         if not target:
@@ -865,7 +870,7 @@ class AgentAndroidClient:
 
     def _find_element_by_refId(self, refId: int,
                                 force_refresh: bool = False) -> Optional[Dict]:
-        """从缓存树中查找元素（找不到才重新获取）"""
+        """Find an element from the cached tree and only refetch when needed."""
         tree = self.get_ui_elements(force_refresh=force_refresh)
         if not tree:
             return None
@@ -893,14 +898,17 @@ class AgentAndroidClient:
 
     def find_by_xpath(self, elements: List[Dict], xpath: str) -> Optional[Dict]:
         """
-        根据 XPath 条件查找元素。
-        支持格式: //ClassName[@attr='value'][@attr2='value2']
+        Find the first element that matches the given XPath-like filter.
+
+        Supported formats:
+              //ClassName[@attr='value'][@attr2='value2']
               //ClassName[@following-sibling::OtherClass]
               //ClassName[@preceding-sibling::OtherClass]
-        例如: //EditText[@text='搜索, ']
-              //Button[@text='搜索'][following-sibling::Button]
-              //TextView[@contentDesc='搜索'][clickable]
-        返回第一个匹配元素，或 None。
+        Examples:
+              //EditText[@text='Search']
+              //Button[@text='Search'][following-sibling::Button]
+              //TextView[@contentDesc='Search'][clickable]
+        Returns the first matching element, or `None`.
         """
         import re
         attrs = {}
@@ -911,7 +919,7 @@ class AgentAndroidClient:
             if xpath[i] == '[':
                 j = i + 1
                 depth = 1
-                in_quote = None  # 当前是否在引号内，以及是什么引号
+                in_quote = None  # Tracks whether we are inside a quoted string and which quote opened it
                 while j < len(xpath) and depth > 0:
                     ch = xpath[j]
                     if in_quote is not None:
@@ -941,10 +949,10 @@ class AgentAndroidClient:
                                     while j2 >= 1 and raw_value[j2] == '\\':
                                         num_backslash += 1
                                         j2 -= 1
-                                    if num_backslash % 2 == 0:  # 非转义引号
+                                    if num_backslash % 2 == 0:  # Unescaped quote
                                         break
                                 end += 1
-                            value = raw_value[1:end]  # 去掉首尾引号
+                            value = raw_value[1:end]  # Strip the surrounding quotes
                         else:
                             bracket_pos = raw_value.find(']')
                             value = raw_value[:bracket_pos].strip() if bracket_pos >= 0 else raw_value.strip()
@@ -986,7 +994,7 @@ class AgentAndroidClient:
                 seg_to_elem[key].append(e)
 
         def _get_prefix_seg(xp: str, up_to_depth: int) -> str:
-            """取 xpath 前 N 段的最小公共形式（去掉索引如 [2]）"""
+            """Return the minimal common form of the first N xpath segments without indices such as [2]."""
             segs = [s for s in xp.split('/') if s and s != 'WindowRoot']
             parts = []
             for di in range(min(up_to_depth, len(segs))):
@@ -1007,7 +1015,7 @@ class AgentAndroidClient:
             if depth < 2:
                 parent_of[rid] = None
                 continue
-            parent_seg = segs[-2]  # 倒数第二个 segment = 父节点
+            parent_seg = segs[-2]  # The second-to-last segment is the parent node
             candidates = seg_to_elem.get((depth - 1, parent_seg), [])
             if len(candidates) == 1:
                 parent_of[rid] = candidates[0].get('refId')
@@ -1115,8 +1123,10 @@ class AgentAndroidClient:
 
     def find_by_xpath_all(self, elements: List[Dict], xpath: str) -> List[Dict]:
         """
-        根据 XPath 条件查找所有匹配元素。
-        与 find_by_xpath 相同逻辑，但返回所有匹配项而非仅第一个。
+        Find all elements that match the given XPath-like filter.
+
+        This uses the same logic as `find_by_xpath`, but returns every match
+        instead of only the first one.
         """
         import re
         attrs = {}
@@ -1275,16 +1285,18 @@ class AgentAndroidClient:
         return [elem for elem in elements if matches(elem)]
 
     def _escape_xpath_value(self, value: str) -> str:
-        """为 XPath 属性值选择最佳引号并转义内容"""
+        """Choose the best quotes for an XPath attribute value and escape the content."""
         if "'" in value and '"' not in value:
             return f'"{value}"'
         return f"'{value}'"
 
     def _make_xpath(self, cls: str, **conditions: Any) -> str:
         """
-        构建 XPath 字符串。
-        cls: 类名（如 'Button', 'EditText'）
-        **conditions: 属性条件，如 text='搜索', refId=5, clickable=True, resourceId='...'
+        Build an XPath string.
+
+        cls: class name such as 'Button' or 'EditText'
+        **conditions: attribute conditions such as text='Search', refId=5,
+                      clickable=True, resourceId='...'
         """
         parts = [f'//{cls}']
         for k, v in conditions.items():
@@ -1295,7 +1307,7 @@ class AgentAndroidClient:
         return ''.join(parts)
 
     def _parse_refid_from_xpath_segment(self, segment: str) -> Optional[int]:
-        """从 xpath 片段（如 'LinearLayout[1][@refId=5]'）中提取 refId"""
+        """Extract a refId from an xpath segment such as 'LinearLayout[1][@refId=5]'."""
         i = 0
         while i < len(segment):
             if segment[i] == '[':
@@ -1330,16 +1342,19 @@ class AgentAndroidClient:
         self, tree: List[Dict]
     ) -> Dict[int, Dict]:
         """
-        从扁平元素列表构建树结构（parent→children 映射）。
+        Build a tree structure from a flat element list (parent -> children mapping).
 
-        策略：由于 accessibility xpath 路径中某些中间节点可能没有 @refId，
-        无法通过父 segment 的 @refId 找 parent。
-        改用「栈」：按 depth 顺序遍历所有元素，维护每层最后一个 refId。
-        每遇到更浅深度的元素就 pop，更深就 push。
-        包含 depth 和 xpath 前缀以支持前缀匹配。
-        每个节点: {elem, parent_ref_id, depth, xpath_prefix, children_ref_ids}
+        Strategy:
+        Some intermediate nodes in accessibility xpaths may not expose @refId,
+        so we cannot always derive the parent from the parent segment's @refId.
+        Instead we use a stack: traverse elements by depth order and keep the
+        most recent refId at each depth. When the next element is shallower we
+        pop; when it is deeper we push.
+
+        Each node contains:
+        {elem, parent_ref_id, depth, xpath_prefix, children_ref_ids}
         """
-        elem_xpath: Dict[int, str] = {}  # refId -> xpath prefix (不含当前段)
+        elem_xpath: Dict[int, str] = {}  # refId -> xpath prefix (without the current segment)
         elem_depth: Dict[int, int] = {}
 
         for elem in tree:
@@ -1356,7 +1371,7 @@ class AgentAndroidClient:
                 prefix = '/WindowRoot'
             elem_xpath[ref_id] = prefix
 
-        stack: List[int] = []  # 按 depth 顺序排列的 refId 列表，stack[depth] = refId
+        stack: List[int] = []  # refIds ordered by depth; stack[depth] = refId
         elem_parent: Dict[int, Optional[int]] = {}
 
         indexed = [(elem_depth[rid], i, rid) for i, rid in enumerate(elem_depth)]
@@ -1390,7 +1405,7 @@ class AgentAndroidClient:
         return nodes
 
     def _depth_from_xpath(self, xpath: str) -> int:
-        """从 accessibility xpath 计数层数（不含 WindowRoot）"""
+        """Count the depth of an accessibility xpath, excluding WindowRoot."""
         if not xpath:
             return -1
         segments = [s for s in xpath.split('/') if s and s != 'WindowRoot']
@@ -1398,8 +1413,10 @@ class AgentAndroidClient:
 
     def _make_absolute_xpath(self, tree: List[Dict], target_ref_id: int) -> Optional[str]:
         """
-        生成绝对路径 XPath：ClassName[1]/ClassName[3]/TargetClassName[N]
-        从根节点沿路径到 target，每层按同类 sibling 中的位置编号。
+        Build an absolute XPath such as ClassName[1]/ClassName[3]/TargetClassName[N].
+
+        The path is traced from the root to the target, numbering each step by
+        the position among siblings of the same class.
         """
         nodes = self._build_tree_structure(tree)
         if target_ref_id not in nodes:
@@ -1410,7 +1427,7 @@ class AgentAndroidClient:
         while cur is not None:
             path_ref_ids.append(cur)
             cur = nodes[cur]['parent_ref_id']
-        path_ref_ids.reverse()  # 从根到 target
+        path_ref_ids.reverse()  # Order from root to target
 
         segments: List[str] = []
         for ref_id in path_ref_ids:
@@ -1678,11 +1695,13 @@ class AgentAndroidClient:
         self, tree: List[Dict], target_ref_id: int
     ) -> Optional[str]:
         """
-        生成 ancestor-relative XPath：
-        从 target 往根走，找到最近的能用非 refId 属性唯一标识的祖先节点，
-        然后用 // 连接到 target（带上中间路径的 class+position）。
+        Build an ancestor-relative XPath.
 
-        例如: //LinearLayout[@text='搜索']//EditText[1]
+        Walk upward from the target and find the nearest ancestor that can be
+        uniquely identified without refId, then connect that ancestor to the
+        target with `//` plus the intermediate class+position path.
+
+        Example: //LinearLayout[@text='Search']//EditText[1]
         """
         nodes = self._build_tree_structure(tree)
         if target_ref_id not in nodes:
@@ -1693,7 +1712,7 @@ class AgentAndroidClient:
         while cur is not None:
             path_ids.append(cur)
             cur = nodes[cur]['parent_ref_id']
-        path_ids.reverse()  # 从根到 target
+        path_ids.reverse()  # Order from root to target
 
         for i in range(len(path_ids) - 2, -1, -1):
             ancestor_id = path_ids[i]
@@ -1746,13 +1765,15 @@ class AgentAndroidClient:
         ancestor_id: int, target_ref_id: int, ancestor_xp: str
     ) -> str:
         """
-        从 ancestor XPath 构建到 target 的 descendant 路径。
-        使用 className + sibling index 来区分多个同类型中间节点。
+        Build the descendant path from an ancestor XPath to the target.
+
+        Uses className + sibling index to distinguish repeated intermediate
+        nodes of the same class.
         """
         path_ids: List[int] = []
         cur = target_ref_id
         while cur != ancestor_id:
-            path_ids.insert(0, cur)  # 插入到开头（从 ancestor 方向开始）
+            path_ids.insert(0, cur)  # Insert at the front so the path starts at the ancestor
             cur = nodes[cur]['parent_ref_id']
             if cur is None:
                 break
@@ -1786,19 +1807,21 @@ class AgentAndroidClient:
         self, elem: Dict, tree: List[Dict]
     ) -> List[Tuple[str, int, str]]:
         """
-        为指定元素生成多个候选 XPath，按匹配数量排序。
-        输出的 XPath 不含 refId（refId 仅用于内部树结构计算）。
+        Generate multiple XPath candidates for an element and sort them by match count.
 
-        返回: List[(xpath_string, match_count, strategy_description)]
-        strategy 优先级:
-          1. text（直接用元素的 text 定位）
-          2. contentDesc（图标的描述）
-          3. ancestor-relative（祖先节点 + descendant 路径）
-          4. className+position（祖先唯一时带兄弟位置索引）
+        The emitted XPaths never include refId directly; refId is only used for
+        internal tree structure calculations.
+
+        Returns: List[(xpath_string, match_count, strategy_description)]
+        Strategy priority:
+          1. text (directly match the element text)
+          2. contentDesc (use the icon/content description)
+          3. ancestor-relative (ancestor node + descendant path)
+          4. className+position (sibling index when the ancestor is unique)
           5. className + resourceId
-          6. className + text + resourceId（组合）
-          7. className + text + contentDesc（组合）
-          8. className 单独兜底
+          6. className + text + resourceId (combined)
+          7. className + text + contentDesc (combined)
+          8. className-only fallback
         """
         candidates: List[Tuple[str, int, str]] = []
         seen_xpaths: set = set()
@@ -1872,7 +1895,7 @@ class AgentAndroidClient:
         return candidates
 
     def tap_by_xpath(self, xpath: str) -> bool:
-        """使用 Android 运行时 locator 模式点击 XPath。"""
+        """Tap an element by XPath using Android runtime locator mode."""
         return self._run_single_operation(
             template_id="tap-xpath",
             operation_type="android.touch.tap",
@@ -1882,7 +1905,7 @@ class AgentAndroidClient:
         )
 
     def input_by_xpath(self, xpath: str, text: str) -> bool:
-        """使用 Android 运行时 XPath 定位输入元素。"""
+        """Input text by XPath using Android runtime locator mode."""
         return self._run_single_operation(
             template_id="input-xpath",
             operation_type="android.element.input",
@@ -1976,71 +1999,71 @@ def print_tree(elements: List[Dict], filter_text: str = None,
 
 class AriaReplSession:
     """
-    agent-android REPL 会话。
+    agent-android REPL session.
 
-    命令语法：动词 [+ 副词/参数]
-    示例：
-      l                    → 列出元素（复用缓存）
-      ss                   → 刷新树并列出
-      t 5                 → 点击 refId=5
-      i 5 你好            → 向 refId=5 输入文本
-      s                    → 截图（自动命名）
-      s my.png            → 截图到指定路径
-      sw d                 → 下滑（down/up/left/right）
-      sw d --dur 500 --dist 0.7  → 下滑500ms，距离0.7
-      wf 搜索              → 等待"搜索"元素（默认30s）
-      wf 搜索 --t 60       → 等待最多60s
-      g 5 text            → 获取 refId=5 的 text 属性
-      p home              → 按 Home 键
-      b                    → 返回
-      la com.xingin.xhs    → 启动 App
-      f 搜索               → 过滤含"搜索"的元素
-      id com.example:id/btn → 按 resourceId 过滤
-      ref 5                → refId=5 详情
-      x 5                  → refId=5 的 XPath
-      raw                  → 切换原始 JSON 输出
-      vars                 → 显示会话变量
-      set url http://...   → 设置服务器 URL
-      set timeout 30       → 设置默认等待超时
-      h                    → 显示帮助
-      q                    → 退出
+    Command syntax: verb [+ modifiers/arguments]
+    Examples:
+      l                    -> list elements (reuse cache)
+      ss                   -> refresh the tree and list again
+      t 5                  -> tap refId=5
+      i 5 hello            -> input text into refId=5
+      s                    -> capture a screenshot with an auto-generated name
+      s my.png             -> capture a screenshot to a specific path
+      sw d                 -> swipe down (down/up/left/right)
+      sw d --dur 500 --dist 0.7  -> swipe down for 500ms at distance 0.7
+      wf Search            -> wait for a "Search" element (default 30s)
+      wf Search --t 60     -> wait up to 60s
+      g 5 text             -> get the text attribute for refId=5
+      p home               -> press the Home key
+      b                    -> navigate back
+      la com.xingin.xhs    -> launch an app
+      f Search             -> filter elements containing "Search"
+      id com.example:id/btn -> filter by resourceId
+      ref 5                -> show refId=5 details
+      x 5                  -> show XPath candidates for refId=5
+      raw                  -> toggle raw JSON output
+      vars                 -> show session variables
+      set url http://...   -> set the server URL
+      set timeout 30       -> set the default wait timeout
+      h                    -> show help
+      q                    -> quit
     """
 
     COMMANDS = [
-        ('l', 'list',          '列出元素（复用缓存）'),
-        ('ss', 'snapshot',     '刷新树并列出'),
-        ('f', 'find',          '按文本过滤'),
-        ('id', None,           '按 resourceId 过滤'),
-        ('ref', None,          '显示元素详情'),
-        ('x', 'xpath',        '获取 XPath（显示候选+匹配数）'),
-        ('xx', None,           '用自动XPath点击（选最佳唯一候选）'),
-        ('vx', 'validatex',    '运行时验证 XPath'),
-        ('t', 'tap',          '点击元素 (refId)'),
-        ('tx', 'tapx',       '用 XPath 点击元素'),
-        ('i', 'input',        '输入文本 (refId text)'),
-        ('ix', 'inputx',      '用 XPath 输入文本'),
-        ('sw', 'swipe',       '滑动 (d/u/l/r)'),
-        ('p', 'press',        '按键 (back/home/menu)'),
-        ('b', 'back',         '按返回键'),
-        ('wf', 'waitfor',    '等待元素出现'),
-        ('g', 'get',         '获取元素属性'),
-        ('s', 'screenshot',  '截图'),
-        ('la', 'launch',     '启动 App'),
-        ('raw', None,        '切换 raw JSON 输出'),
-        ('vars', None,        '显示会话变量'),
-        ('apps', None,        '列出 launcher apps'),
-        ('set', None,         '设置变量 (url/timeout)'),
-        ('h', 'help',        '显示帮助'),
-        ('q', 'quit',        '退出'),
+        ('l', 'list',          'List elements (reuse cache)'),
+        ('ss', 'snapshot',     'Refresh the tree and list again'),
+        ('f', 'find',          'Filter by text'),
+        ('id', None,           'Filter by resourceId'),
+        ('ref', None,          'Show element details'),
+        ('x', 'xpath',         'Show XPath candidates and match counts'),
+        ('xx', None,           'Tap via the best unique auto-generated XPath'),
+        ('vx', 'validatex',    'Validate an XPath at runtime'),
+        ('t', 'tap',           'Tap an element by refId'),
+        ('tx', 'tapx',         'Tap an element by XPath'),
+        ('i', 'input',         'Input text (refId text)'),
+        ('ix', 'inputx',       'Input text by XPath'),
+        ('sw', 'swipe',        'Swipe (d/u/l/r)'),
+        ('p', 'press',         'Press a key (back/home/menu)'),
+        ('b', 'back',          'Press Back'),
+        ('wf', 'waitfor',      'Wait for an element to appear'),
+        ('g', 'get',           'Read an element attribute'),
+        ('s', 'screenshot',    'Capture a screenshot'),
+        ('la', 'launch',       'Launch an app'),
+        ('raw', None,          'Toggle raw JSON output'),
+        ('vars', None,         'Show session variables'),
+        ('apps', None,         'List launcher apps'),
+        ('set', None,          'Set variables (url/timeout)'),
+        ('h', 'help',          'Show help'),
+        ('q', 'quit',          'Quit'),
     ]
 
     def __init__(self, url: str, history_file: str = None):
         self.client = AriaTreeClient(url)
-        self._tree: Optional[List[Dict]] = None   # 当前缓存的树
-        self._raw_output: bool = False            # raw JSON 输出开关
-        self._timeout: int = 30                  # 默认等待超时（秒）
+        self._tree: Optional[List[Dict]] = None   # Currently cached tree
+        self._raw_output: bool = False            # Raw JSON output toggle
+        self._timeout: int = 30                  # Default wait timeout in seconds
         self._prompt: str = "aria> "
-        self.variables: Dict[str, Any] = {}      # 会话变量（LAST_XPATH 等）
+        self.variables: Dict[str, Any] = {}      # Session variables (LAST_XPATH, etc.)
 
         if _HAS_READLINE and history_file:
             try:
@@ -2075,8 +2098,8 @@ class AriaReplSession:
                     break
 
             except KeyboardInterrupt:
-                print()  # 换行
-                print("  (Ctrl+C: 输入 q 退出)", file=sys.stderr)
+                print()  # New line after Ctrl+C
+                print("  (Ctrl+C: type q to quit)", file=sys.stderr)
                 continue
             except EOFError:
                 break
@@ -2091,12 +2114,13 @@ class AriaReplSession:
 
     def _parse_line(self, line: str) -> Tuple[str, List[str]]:
         """
-        解析一行命令。
-        返回 (command_name, [arg1, arg2, ...])
-        支持:
-          - 空白符分隔
-          - 双引号/单引号字符串
-          - --flag value 风格参数
+        Parse a single REPL command line.
+
+        Returns (command_name, [arg1, arg2, ...]).
+        Supports:
+          - whitespace-separated tokens
+          - double-quoted or single-quoted strings
+          - --flag value style parameters
         """
         stripped = line.strip()
         if not stripped:
@@ -2178,13 +2202,13 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _ensure_tree(self, force=False) -> Optional[List[Dict]]:
-        """确保有缓存的树（必要时刷新）"""
+        """Ensure a cached tree exists, refreshing it when needed."""
         if force or self._tree is None:
             self._tree = self.client.get_ui_elements(force_refresh=True)
         return self._tree
 
     def _invalidate_tree(self):
-        """操作后使树缓存失效"""
+        """Invalidate the cached tree after a UI action."""
         self._tree = None
         self.client._local_tree = None
 
@@ -2193,7 +2217,7 @@ class AriaReplSession:
         return pkg or "unknown"
 
     def _print_tree(self, elements: List[Dict], title: str = None):
-        """格式化打印元素列表"""
+        """Pretty-print a list of elements."""
         print()
         n = len(elements)
         title = title or f"ARIA Tree - {n} elements"
@@ -2217,7 +2241,7 @@ class AriaReplSession:
     def _runtime_validate_candidates(
         self, candidates: List[Tuple[str, int, str]]
     ) -> List[Tuple[str, int, str, Optional[Dict[str, Any]]]]:
-        """使用 Android 运行时 evaluator 验证候选 XPath。"""
+        """Validate XPath candidates with the Android runtime evaluator."""
         validated: List[Tuple[str, int, str, Optional[Dict[str, Any]]]] = []
         strategy_order = {
             'text': 0,
@@ -2248,7 +2272,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_list(self, args: List[str]) -> bool:
-        """l [n]  — 列出前 n 个元素（默认全部）"""
+        """l [n] - list the first n elements, or all elements by default."""
         limit = None
         if args and args[0].isdigit():
             limit = int(args[0])
@@ -2261,7 +2285,7 @@ class AriaReplSession:
         return True
 
     def _cmd_snapshot(self, args: List[str]) -> bool:
-        """ss — 强制刷新树并列出"""
+        """ss - force-refresh the tree and print it."""
         tree = self._ensure_tree(force=True)
         if not tree:
             self._print_error(f"Failed to get ARIA tree (package={self._current_package_label()})")
@@ -2279,7 +2303,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_find(self, args: List[str]) -> bool:
-        """f [text] — 按文本过滤元素"""
+        """f [text] - filter elements by text."""
         if not args:
             self._print_error("Usage: f <text>")
             return False
@@ -2298,7 +2322,7 @@ class AriaReplSession:
         return self._cmd_find(args)
 
     def _cmd_id(self, args: List[str]) -> bool:
-        """id <resourceId> — 按 resourceId 过滤"""
+        """id <resourceId> - filter elements by resourceId."""
         if not args:
             self._print_error("Usage: id <resourceId>")
             return False
@@ -2314,7 +2338,7 @@ class AriaReplSession:
         return True
 
     def _cmd_ref(self, args: List[str]) -> bool:
-        """ref <N> — 显示 refId 详情"""
+        """ref <N> - show details for refId=N."""
         if not args or not args[0].isdigit():
             self._print_error("Usage: ref <refId>")
             return False
@@ -2330,9 +2354,9 @@ class AriaReplSession:
         return True
 
     def _cmd_xpath(self, args: List[str]) -> bool:
-        """x <N> [idx] — 获取元素 XPath（按 Android 运行时匹配数量验证）"""
+        """x <N> [idx] - show XPath candidates validated by Android runtime match counts."""
         if not args or not args[0].isdigit():
-            self._print_error("Usage: x <refId> [候选序号]")
+            self._print_error("Usage: x <refId> [candidate-index]")
             return False
         refId = int(args[0])
         tree = self._ensure_tree()
@@ -2356,24 +2380,24 @@ class AriaReplSession:
         print(f"  refId={refId}  text='{elem.get('text', '')[:30]}'  "
               f"class={elem.get('simpleClassName', '')}")
         if ui_tree_absolute:
-            print(f"  UI tree 绝对路径: {ui_tree_absolute}")
+            print(f"  UI tree absolute path: {ui_tree_absolute}")
         if runtime_absolute:
             runtime_count = runtime_absolute_info.get('count') if runtime_absolute_info else '?'
-            print(f"  Runtime 绝对路径: {runtime_absolute}  (match={runtime_count})")
+            print(f"  Runtime absolute path: {runtime_absolute}  (match={runtime_count})")
         print(f"  {'─' * 60}")
-        print(f"  {'序号':<4} {'运行时匹配':<10} {'XPath'}")
+        print(f"  {'Idx':<4} {'Runtime':<10} {'XPath'}")
         print(f"  {'─' * 60}")
 
         for i, (xp, count, strategy, info) in enumerate(candidates):
             badge = ''
             if count < 0:
-                badge = ' ❓ 错误'
+                badge = ' ? error'
             elif count == 1:
-                badge = ' ✅ 唯一'
+                badge = ' OK unique'
             elif count <= 3:
-                badge = f' ⚠️  {count}个'
+                badge = f' ! {count} matches'
             else:
-                badge = f' ❌  {count}个'
+                badge = f' X {count} matches'
             xp_display = xp if len(xp) <= 55 else xp[:52] + '...'
             print(f"  [{i}] {badge:<8} {xp_display}  ({strategy})")
             if info and count == 1:
@@ -2383,29 +2407,29 @@ class AriaReplSession:
         print(f"  {'─' * 60}")
         best = candidates[0]
         if best[1] == 1:
-            print(f"  ✓ 推荐: {best[0]}")
-            print(f"    策略={best[2]}，运行时匹配 1 个元素（唯一）")
+            print(f"  Recommended: {best[0]}")
+            print(f"    strategy={best[2]}, runtime matched exactly 1 element")
         elif best[1] < 0:
-            print(f"  ⚠  最佳候选验证失败，建议先用 'vx <xpath>' 单独排查")
-            print(f"     推荐: {best[0]}")
+            print(f"  Warning: best candidate validation failed; try 'vx <xpath>' first")
+            print(f"     recommended: {best[0]}")
         else:
-            print(f"  ⚠  最佳候选运行时匹配 {best[1]} 个元素，可能不够唯一")
-            print(f"     推荐: {best[0]}")
+            print(f"  Warning: best candidate matched {best[1]} elements at runtime and may not be unique")
+            print(f"     recommended: {best[0]}")
 
         if len(args) >= 2 and args[1].isdigit():
             idx = int(args[1])
             if 0 <= idx < len(candidates):
                 chosen = candidates[idx]
-                print(f"\n  使用 [{idx}] {chosen[0]}")
-                print(f"  策略: {chosen[2]}，运行时匹配 {chosen[1]} 个元素")
+                print(f"\n  Using [{idx}] {chosen[0]}")
+                print(f"  Strategy: {chosen[2]}, runtime matched {chosen[1]} elements")
                 if chosen[1] > 1:
-                    print(f"  [!] 警告: 此 XPath 运行时匹配 {chosen[1]} 个元素，点击可能不精确！")
+                    print(f"  [!] Warning: this XPath matches {chosen[1]} elements at runtime, so tapping may be imprecise")
                 self.variables['LAST_XPATH'] = chosen[0]
                 self.variables['LAST_XPATH_COUNT'] = chosen[1]
                 self.variables['LAST_XPATH_STRATEGY'] = chosen[2]
                 self.variables['LAST_XPATH_RUNTIME'] = chosen[3]
             else:
-                print(f"  [!] 序号 {idx} 超出范围 (0-{len(candidates)-1})")
+                print(f"  [!] Candidate index {idx} is out of range (0-{len(candidates)-1})")
         else:
             self.variables['LAST_XPATH'] = best[0]
             self.variables['LAST_XPATH_COUNT'] = best[1]
@@ -2420,7 +2444,7 @@ class AriaReplSession:
         return self._cmd_xpath(args)
 
     def _cmd_xx(self, args: List[str]) -> bool:
-        """xx <N> — 用自动生成的唯一 XPath 点击元素（优先选唯一匹配）"""
+        """xx <N> - tap via an auto-generated unique XPath when possible."""
         if not args or not args[0].isdigit():
             self._print_error("Usage: xx <refId>")
             return False
@@ -2447,16 +2471,16 @@ class AriaReplSession:
 
         if unique:
             xp, count, strategy, _ = unique
-            print(f"  ✓ refId={refId} → XPath (唯一匹配): {xp}")
-            print(f"    策略: {strategy}")
+            print(f"  Success: refId={refId} -> XPath (unique match): {xp}")
+            print(f"    strategy: {strategy}")
         else:
             xp, count, strategy, _ = candidates[0]
-            print(f"  [!] refId={refId}: 没有找到唯一匹配的 XPath！")
-            print(f"  ⚠  使用最佳候选: {xp}")
-            print(f"     策略: {strategy}，运行时匹配 {count} 个元素")
-            print(f"  ❌ 点击被拒绝 — XPath 不够唯一，可能误触！")
+            print(f"  [!] refId={refId}: no uniquely matching XPath was found")
+            print(f"  Warning: best candidate: {xp}")
+            print(f"     strategy: {strategy}, runtime matched {count} elements")
+            print(f"  Tap refused - the XPath is not unique enough and may hit the wrong element")
             print(f"  ")
-            print(f"  提示: 用 'x {refId}' 查看所有候选，用 'x {refId} <序号>' 选中非唯一 XPath")
+            print(f"  Tip: use 'x {refId}' to inspect all candidates, or 'x {refId} <index>' to choose a non-unique XPath")
             return False
 
         ok = self.client.tap_by_xpath(xp)
@@ -2465,11 +2489,11 @@ class AriaReplSession:
         return ok
 
     def _cmd_xx_alias(self, args: List[str]) -> bool:
-        """tapx-auto <refId> — 同 xx"""
+        """tapx-auto <refId> - alias for xx."""
         return self._cmd_xx(args)
 
     def _cmd_validatex(self, args: List[str]) -> bool:
-        """vx <xpath> — 运行时验证 XPath"""
+        """vx <xpath> - validate an XPath at runtime."""
         if not args:
             self._print_error("Usage: vx <xpath>")
             return False
@@ -2495,7 +2519,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_tap(self, args: List[str]) -> bool:
-        """t <refId> — 点击元素"""
+        """t <refId> - tap an element."""
         if not args or not args[0].isdigit():
             self._print_error("Usage: t <refId>")
             return False
@@ -2509,7 +2533,7 @@ class AriaReplSession:
         return self._cmd_tap(args)
 
     def _cmd_input(self, args: List[str]) -> bool:
-        """i <refId> <text> — 向元素输入文本"""
+        """i <refId> <text> - input text into an element."""
         if len(args) < 2 or not args[0].isdigit():
             self._print_error("Usage: i <refId> <text>")
             return False
@@ -2524,12 +2548,12 @@ class AriaReplSession:
         return self._cmd_input(args)
 
     def _cmd_tapx(self, args: List[str]) -> bool:
-        """tx <xpath> — 用 XPath 点击元素"""
+        """tx <xpath> - tap an element by XPath."""
         if not args:
             self._print_error("Usage: tx <xpath>")
-            self._print_error("  例: tx //EditText[@text='搜索']")
-            self._print_error("  例: tx //Button[@text='OK']")
-            self._print_error("  例: tx //TextView[@contentDescription='搜索'][clickable]")
+            self._print_error("  Example: tx //EditText[@text='Search']")
+            self._print_error("  Example: tx //Button[@text='OK']")
+            self._print_error("  Example: tx //TextView[@contentDescription='Search'][clickable]")
             return False
         xpath = ' '.join(args)
         ok = self.client.tap_by_xpath(xpath)
@@ -2541,10 +2565,10 @@ class AriaReplSession:
         return self._cmd_tapx(args)
 
     def _cmd_inputx(self, args: List[str]) -> bool:
-        """ix <xpath> <text> — 用 XPath 向输入框输入文本"""
+        """ix <xpath> <text> - input text into a field by XPath."""
         if len(args) < 2:
             self._print_error("Usage: ix <xpath> <text>")
-            self._print_error("  例: ix //EditText[@text='搜索'] hello")
+            self._print_error("  Example: ix //EditText[@text='Search'] hello")
             return False
         xpath = args[0]
         text = ' '.join(args[1:])
@@ -2557,7 +2581,7 @@ class AriaReplSession:
         return self._cmd_inputx(args)
 
     def _cmd_swipe(self, args: List[str]) -> bool:
-        """sw <d|u|l|r> [--dur N] [--dist N] — 滑动"""
+        """sw <d|u|l|r> [--dur N] [--dist N] - swipe."""
         if not args or args[0] not in ('d', 'u', 'l', 'r',
                                           'down', 'up', 'left', 'right'):
             self._print_error("Usage: sw <d|u|l|r> [--dur N] [--dist N]")
@@ -2585,7 +2609,7 @@ class AriaReplSession:
         return self._cmd_swipe(args)
 
     def _cmd_press(self, args: List[str]) -> bool:
-        """p <key> — 按键 (back/home/menu)"""
+        """p <key> - press a key (back/home/menu)."""
         if not args:
             self._print_error("Usage: p <back|home|menu>")
             return False
@@ -2598,7 +2622,7 @@ class AriaReplSession:
         return self._cmd_press(args)
 
     def _cmd_back(self, args: List[str]) -> bool:
-        """b — 按返回键"""
+        """b - press Back."""
         ok = self.client.press_back()
         if ok:
             self._invalidate_tree()
@@ -2611,7 +2635,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_waitfor(self, args: List[str]) -> bool:
-        """wf <text> [--t N] — 等待元素出现"""
+        """wf <text> [--t N] - wait for an element to appear."""
         if not args or args[0].startswith('--'):
             self._print_error("Usage: wf <text> [--t N]")
             return False
@@ -2644,7 +2668,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_get(self, args: List[str]) -> bool:
-        """g <refId> <attr> — 获取元素属性"""
+        """g <refId> <attr> - read an element attribute."""
         if len(args) < 2:
             self._print_error("Usage: g <refId> <attr>  (attr: text/class/bounds/x/y/xpath/...)")
             return False
@@ -2657,7 +2681,7 @@ class AriaReplSession:
         return self._cmd_get(args)
 
     def _cmd_screenshot(self, args: List[str]) -> bool:
-        """s [path] — 截图"""
+        """s [path] - capture a screenshot."""
         path = args[0] if args else None
         result = self.client.screenshot(output_path=path)
         if result:
@@ -2672,7 +2696,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_launch(self, args: List[str]) -> bool:
-        """la <package> — 启动 App"""
+        """la <package> - launch an app."""
         if not args:
             self._print_error("Usage: la <package>")
             return False
@@ -2686,7 +2710,7 @@ class AriaReplSession:
         return self._cmd_launch(args)
 
     def _cmd_apps(self, args: List[str]) -> bool:
-        """apps — 列出 launcher apps"""
+        """apps - list launcher apps."""
         apps = self.client.list_launcher_apps()
         if apps is None:
             self._print_error("Failed to fetch launcher apps.")
@@ -2703,13 +2727,13 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_raw(self, args: List[str]) -> bool:
-        """raw — 切换 raw JSON 输出"""
+        """raw - toggle raw JSON output."""
         self._raw_output = not self._raw_output
         print(f"  Raw JSON output: {'ON' if self._raw_output else 'OFF'}")
         return True
 
     def _cmd_vars(self, args: List[str]) -> bool:
-        """vars — 显示会话变量"""
+        """vars - show session variables."""
         print("  Session:")
         print(f"    URL:      {self.client.base_url}")
         print(f"    Timeout:  {self._timeout}s")
@@ -2720,7 +2744,7 @@ class AriaReplSession:
         return True
 
     def _cmd_set(self, args: List[str]) -> bool:
-        """set <url|timeout> <value> — 设置会话变量"""
+        """set <url|timeout> <value> - set a session variable."""
         if len(args) < 2:
             self._print_error("Usage: set <url|timeout> <value>")
             return False
@@ -2749,7 +2773,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_help(self, args: List[str]) -> bool:
-        """h — 显示帮助"""
+        """h - show help."""
         self._print_help()
         return True
 
@@ -2757,7 +2781,7 @@ class AriaReplSession:
         return self._cmd_help(args)
 
     def _cmd_quit(self, args: List[str]) -> Any:
-        """q — 退出"""
+        """q - quit."""
         return _REPL_EXIT
 
     def _cmd_q(self, args: List[str]) -> Any:
@@ -2773,48 +2797,48 @@ class AriaReplSession:
             "  ─" + "─" * 66,
             "",
             "  Browse",
-            "    l [n]             列出元素（n=显示前n个，reuse缓存）",
-            "    ss                刷新树并列出（force refresh）",
-            "    f <text>          按文本过滤元素",
-            "    id <resourceId>   按 resourceId 过滤",
-            "    ref <N>           显示 refId=N 的详细信息",
-            "    x <N> [idx]       显示 refId=N 的 XPath 候选列表（按运行时匹配数验证）",
-            "                       用 'x <N> <idx>' 选中特定候选并存为 LAST_XPATH",
-            "    xx <N>            选唯一候选 XPath 自动点击（无唯一候选则拒绝）",
-            "    vx <xpath>        运行时验证 XPath 的匹配数量",
+            "    l [n]             List elements (show the first n entries, reuse cache)",
+            "    ss                Refresh the tree and list again (force refresh)",
+            "    f <text>          Filter elements by text",
+            "    id <resourceId>   Filter by resourceId",
+            "    ref <N>           Show detailed information for refId=N",
+            "    x <N> [idx]       Show XPath candidates for refId=N (validated by runtime match count)",
+            "                       Use 'x <N> <idx>' to select a specific candidate and store it as LAST_XPATH",
+            "    xx <N>            Tap via a unique XPath candidate automatically (refuses non-unique candidates)",
+            "    vx <xpath>        Validate the runtime match count for an XPath",
             "",
             "  Interact",
-            "    t <N>             点击 refId=N 的元素",
-            "    tx <xpath>        用 XPath 点击元素",
-            "                       例: tx //Button[@text='搜索']",
-            "                       例: tx //EditText[@text='搜索']",
-            "    i <N> <text>      向 refId=N 输入文本",
-            "    ix <xpath> <text> 用 XPath 输入文本",
-            "                       例: ix //EditText[@text='搜索'] 你好",
+            "    t <N>             Tap the element with refId=N",
+            "    tx <xpath>        Tap an element by XPath",
+            "                       Example: tx //Button[@text='Search']",
+            "                       Example: tx //EditText[@text='Search']",
+            "    i <N> <text>      Input text into refId=N",
+            "    ix <xpath> <text> Input text by XPath",
+            "                       Example: ix //EditText[@text='Search'] hello",
             "    sw <d|u|l|r> [--dur N] [--dist N]",
-            "                       滑动（d=down, u=up, l=left, r=right）",
-            "    p <key>           按键 (back/home/menu)",
-            "    b                  按返回键",
+            "                       Swipe (d=down, u=up, l=left, r=right)",
+            "    p <key>           Press a key (back/home/menu)",
+            "    b                  Press Back",
             "",
             "  Wait",
-            "    wf <text> [--t N]  等待元素出现（默认30s超时）",
+            "    wf <text> [--t N]  Wait for an element to appear (default timeout: 30s)",
             "",
             "  Info",
-            "    g <N> <attr>     获取 refId=N 的属性",
+            "    g <N> <attr>     Read an attribute from refId=N",
             "                       (text/class/bounds/x/y/xpath/selector/...)",
-            "    s [path]          截图（无参数=自动命名）",
-            "    la <package>      启动 App（如 com.xingin.xhs）",
+            "    s [path]          Capture a screenshot (no argument = auto filename)",
+            "    la <package>      Launch an app (for example com.xingin.xhs)",
             "",
             "  Session",
-            "    raw                切换 raw JSON 输出",
-            "    vars               显示会话变量",
-            "    apps               列出 launcher apps",
-            "    set url <url>      切换服务器 URL",
-            "    set timeout <N>    设置默认等待超时（秒）",
+            "    raw                Toggle raw JSON output",
+            "    vars               Show session variables",
+            "    apps               List launcher apps",
+            "    set url <url>      Switch the server URL",
+            "    set timeout <N>    Set the default wait timeout (seconds)",
             "",
             "  Exit",
-            "    q                  退出 REPL",
-            "    h                  显示本帮助",
+            "    q                  Quit the REPL",
+            "    h                  Show this help",
             "",
             "  Shortcuts: l→list, ss→snapshot, t→tap, tx→tapx, xx→tapx-auto,",
             "              i→input, ix→inputx, sw→swipe, p→press, b→back,",
