@@ -1,5 +1,10 @@
 # Release Notes — v0.1.0 Beta
 
+## Download
+
+- APK asset: `aivane.apk`
+- Download from the `Assets` section on this GitHub pre-release page.
+
 ## Highlights
 
 - Exposed the Python REPL client (`clients/python/agent-android.py`) that talks to `/api/execute`, `/health`, `/screenshot`, `/api/apps`, and `/api/stop`.
@@ -16,6 +21,6 @@
 
 - Improve public template examples for advanced `/api/execute` flows.
 - Improve screenshot retry experience when permission is denied.
-- Publish beta APK builds through GitHub pre-releases and iterate on the release notes as testing continues.
+- Keep iterating on the GitHub pre-release notes, install guide, and examples as beta feedback arrives.
 
 
