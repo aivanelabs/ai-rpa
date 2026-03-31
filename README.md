@@ -10,7 +10,7 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 
 - The repo structure and public CLI are ready for evaluation.
 - GitHub is the only official entry point for the beta.
-- APK builds are distributed through GitHub pre-releases.
+- APK builds are distributed through [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases).
 
 ## Who This Is For
 
@@ -63,7 +63,7 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 - `docs/`: quickstart, protocol, permissions, known limitations, feedback, release notes, and repo scope.
 - `examples/`: smoke flows and minimal usage examples.
 - `skills/agent-android/`: sample skill definition with prompts and agent metadata.
-- GitHub Releases: the only official place to download beta APK builds.
+- [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases): the only official place to download beta APK builds.
 
 ## Installation & Launch
 

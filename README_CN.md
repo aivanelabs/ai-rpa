@@ -8,7 +8,7 @@
 
 - 仓库结构和公开 CLI 已经可以评估和试用。
 - GitHub 是当前 beta 的唯一正式入口。
-- APK 通过 GitHub pre-release 分发。
+- APK 通过 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) 分发。
 
 ## 适合谁
 
@@ -22,7 +22,7 @@
 - 公开协议和用户文档
 - smoke 示例和启动辅助脚本
 - `skills/` 下的 sample agent skills
-- GitHub Releases 中的 beta APK
+- [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) 中的 beta APK
 
 ## 本仓未公开的内容
 
