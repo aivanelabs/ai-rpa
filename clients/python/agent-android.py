@@ -2058,7 +2058,7 @@ class AriaReplSession:
     ]
 
     def __init__(self, url: str, history_file: str = None):
-        self.client = AriaTreeClient(url)
+        self.client = AgentAndroidClient(url)
         self._tree: Optional[List[Dict]] = None   # Currently cached tree
         self._raw_output: bool = False            # Raw JSON output toggle
         self._timeout: int = 30                  # Default wait timeout in seconds
@@ -2754,7 +2754,7 @@ class AriaReplSession:
             if not trimmed_value:
                 self._print_error("URL cannot be empty")
                 return False
-            self.client = AriaTreeClient(trimmed_value)
+            self.client = AgentAndroidClient(trimmed_value)
             print(f"  URL set to: {trimmed_value}")
             try:
                 save_url_to_config(trimmed_value)
@@ -2921,7 +2921,7 @@ def main():
         session.run()
         sys.exit(0)
 
-    client = AriaTreeClient(url)
+    client = AgentAndroidClient(url)
 
     force_refresh = args.no_cache
 

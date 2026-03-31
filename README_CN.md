@@ -1,15 +1,59 @@
 # AIVane AI RPA
 
-这是 `aivane.net` 上公开的 `aivanelabs/ai-rpa` 项目仓，对外展示 AIVane（AI Mobile Automation）Android REPL beta 线。
+这是 `aivane.net` 上 `aivanelabs/ai-rpa` 的对外仓库。
+
+当前首发公开面是 **AIVane Android REPL Beta**：提供 Python CLI、公开文档、示例和 sample skills，让 AI agent 可以在局域网内逐步查看 Android UI 状态并控制手机。
+
+## 当前状态
+
+- 仓库结构和公开 CLI 已经可以评估和试用。
+- Android APK 的正式下载通道还在收尾。
+- 在公开 APK 下载页上线前，安装仍通过私测或共享发布渠道进行。
+
+## 适合谁
+
+- 使用 Codex、Claude Code、OpenClaw 等工具的 AI agent 用户
+- 想要按“查看状态 -> 点击/输入/滑动 -> 再查看状态”方式控制 Android 手机的自动化用户
+- 愿意在可信局域网内，通过 Python CLI 做早期验证的体验者
+
+## 本仓公开的内容
+
+- `clients/python/agent-android.py`
+- 公开协议和用户文档
+- smoke 示例和启动辅助脚本
+- `skills/` 下的 sample agent skills
+
+## 本仓未公开的内容
+
+- Java 核心流程引擎内部实现
+- 超出公开面的 Android runtime 内部实现
+- 内部部署与发布流水线
+- 私有更新渠道、凭据和商业化打包部分
+
+## 安全提示
+
+- 当前 beta 只建议在可信局域网中使用。
+- 不建议把设备端口暴露到公网。
+- 无障碍和截图等敏感能力都需要用户在手机上手动授权。
 
 ## 快速开始
 
-1. 确保 Android 设备安装了 AIVane REPL beta APK，且与电脑在同一 Wi-Fi 网络。
-2. 运行客户端：  
+1. 在手机上安装 AIVane Android REPL beta APK。
+2. 确保手机和电脑在同一 Wi-Fi 网络。
+3. 运行客户端：
    ```bash
    python clients/python/agent-android.py --repl --url http://<device-ip>:8080
    ```
-3. 在 REPL 中保存地址（`set url http://<device-ip>:8080`），接着执行 smoke 流：`health`、`apps`、`la <package>`、`list`、`tap <refId>`、`input <refId>`、`back`、`press home`、`screenshot`（如已授权）。
+4. 在 REPL 中保存地址（`set url http://<device-ip>:8080`），然后跑第一条 smoke 路径：
+   - `health`
+   - `apps`
+   - `la <package>`
+   - `list`
+   - `tap <refId>`
+   - `input <refId> "hello"`
+   - `back`
+   - `press home`
+   - `screenshot`
 
 ## 公开资料
 
@@ -20,7 +64,7 @@
 
 ## 安装与启动
 
-- `docs/install-agent-android.md`：指导 APK 安装、同局域网、首次 smoke。
+- `docs/install-agent-android.md`：说明如何安装 APK、确认局域网连接并完成首次 smoke。
 - `examples/start-app-repl.sh`：公开版启动脚本示例，用于在设备上打开 `aivane.apprepl`。
 
 ## 附加资源

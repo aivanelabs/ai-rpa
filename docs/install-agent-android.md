@@ -4,7 +4,7 @@ This guide covers the public prerequisites for running the agent-android beta (A
 
 ## 1. Install the APK
 
-1. Download the APK from the `aivane.net` download page (or a shared release channel).
+1. Download the APK from the `aivane.net` download page when it is posted, or use the current shared/private beta release channel.
 2. Enable `Install unknown apps` for your browser or file manager.
 3. Install the APK on your Android device; it will appear as **AIVane** in the launcher.
 

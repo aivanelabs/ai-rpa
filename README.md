@@ -2,16 +2,60 @@ See the Chinese overview at [README_CN.md](README_CN.md).
 
 # AIVane AI RPA
 
-This repository represents the public-facing `aivane.net` launch for the `aivanelabs/ai-rpa` project. Under the AIVane umbrella ("AI Mobile Automation"), we start with a transparent Android REPL beta that lets AI agents explore UI trees and drive Android devices through a lightweight Python CLI.
+This repository is the public-facing launch repo for `aivanelabs/ai-rpa` on `aivane.net`.
+
+The first public surface is **AIVane Android REPL Beta**: a lightweight Python CLI, public docs, examples, and sample skills that let AI agents inspect Android UI state and control a phone step by step over LAN.
+
+## Current Status
+
+- The repo structure and public CLI are ready for evaluation.
+- The Android APK release channel is still being finalized.
+- Until the public APK download is posted, installation is handled through a private beta or shared release channel.
+
+## Who This Is For
+
+- AI agent users working with Codex, Claude Code, OpenClaw, or similar tools
+- Automation users who want stepwise Android control: inspect, tap, input, swipe, back, home, screenshot
+- Early evaluators who are comfortable running a Python CLI and testing on a trusted LAN
+
+## What Is Open In This Repo
+
+- `clients/python/agent-android.py`
+- Public protocol and user-facing docs
+- Smoke examples and launch helpers
+- Sample agent skills under `skills/`
+
+## What Is Not Open In This Repo
+
+- Core Java workflow engine internals
+- Android runtime internals beyond the public surface
+- Internal deployment and release infrastructure
+- Private update channels, credentials, and commercial packaging
+
+## Security Note
+
+- Use the beta only on a trusted LAN.
+- Do not expose the device port to the public internet.
+- Accessibility and screenshot capabilities require explicit user approval on the phone.
 
 ## Quick Start
 
-1. Ensure your Android device has the AIVane REPL beta APK installed and is reachable over Wi‑Fi.
-2. Run the CLI:  
+1. Install the AIVane Android REPL beta APK on your phone.
+2. Make sure the phone and computer are on the same Wi-Fi network.
+3. Run the CLI:
    ```bash
    python clients/python/agent-android.py --repl --url http://<device-ip>:8080
    ```
-3. Inside the REPL, save the URL (`set url http://<device-ip>:8080`) and run the smoke path: `health`, `apps`, `la <package>`, `list`, `tap <refId>`, `input <refId>`, `back`, `press home`, `screenshot`.
+4. Inside the REPL, save the URL (`set url http://<device-ip>:8080`) and run the first smoke path:
+   - `health`
+   - `apps`
+   - `la <package>`
+   - `list`
+   - `tap <refId>`
+   - `input <refId> "hello"`
+   - `back`
+   - `press home`
+   - `screenshot`
 
 ## Public Assets
 
@@ -22,7 +66,7 @@ This repository represents the public-facing `aivane.net` launch for the `aivane
 
 ## Installation & Launch
 
-- `docs/install-agent-android.md`: steps to install the APK, ensure LAN connectivity, and run the first smoke.
+- `docs/install-agent-android.md`: how to install the APK, confirm LAN connectivity, and run the first smoke.
 - `examples/start-app-repl.sh`: a public-friendly starter script to connect to a device, optionally install the APK, and launch the Android REPL service.
 
 ## Additional Resources

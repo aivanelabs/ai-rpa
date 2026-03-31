@@ -6,4 +6,4 @@ This Beta milestone exposes a hands-on Android REPL. The following constraints a
 2. **LAN only.** The desktop agent must be on the same Wi-Fi as the phone; there is no cloud relay or NAT traversal build yet.
 3. **REPL-first product surface.** The public story is stepwise control and smoke flows; advanced multi-step template execution remains available through `/api/execute`, but there is not yet a polished public template UI.
 4. **Beta permissions are still hands-on.** Accessibility and screenshot capabilities may still require manual confirmation on the phone.
-5. **No signed public release yet.** APK builds are still in pre-release preparation while the REPL surface is being finalized.
+5. **Public APK distribution is still being finalized.** Until the download page is posted, installation still happens through a private beta or shared release channel.
