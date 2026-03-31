@@ -1,6 +1,6 @@
 # Skills
 
-This directory holds public skills for the `aivanelabs/ai-rpa` project on `aivane.net`.
+This directory holds public skills for the `aivanelabs/ai-rpa` GitHub beta.
 
 ## Current Skills
 

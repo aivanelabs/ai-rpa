@@ -1,14 +1,14 @@
 # AIVane AI RPA
 
-这是 `aivane.net` 上 `aivanelabs/ai-rpa` 的对外仓库。
+这是 `aivanelabs/ai-rpa` 在 GitHub 上的对外仓库。
 
 当前首发公开面是 **AIVane Android REPL Beta**：提供 Python CLI、公开文档、示例和 sample skills，让 AI agent 可以在局域网内逐步查看 Android UI 状态并控制手机。
 
 ## 当前状态
 
 - 仓库结构和公开 CLI 已经可以评估和试用。
-- Android APK 的正式下载通道还在收尾。
-- 在公开 APK 下载页上线前，安装仍通过私测或共享发布渠道进行。
+- GitHub 是当前 beta 的唯一正式入口。
+- APK 通过 GitHub pre-release 分发。
 
 ## 适合谁
 
@@ -22,6 +22,7 @@
 - 公开协议和用户文档
 - smoke 示例和启动辅助脚本
 - `skills/` 下的 sample agent skills
+- GitHub Releases 中的 beta APK
 
 ## 本仓未公开的内容
 

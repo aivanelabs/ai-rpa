@@ -19,7 +19,7 @@
 - [ ] Repository created at `aivanelabs/ai-rpa`
 - [ ] Description set
 - [ ] Topics added
-- [ ] Homepage set to `aivane.net`
+- [ ] GitHub pre-release created with APK asset
 - [ ] Discussions enabled
 - [ ] Issues enabled
 - [x] First release notes complete

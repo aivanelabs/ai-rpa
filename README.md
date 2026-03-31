@@ -2,15 +2,15 @@ See the Chinese overview at [README_CN.md](README_CN.md).
 
 # AIVane AI RPA
 
-This repository is the public-facing launch repo for `aivanelabs/ai-rpa` on `aivane.net`.
+This repository is the public-facing launch repo for `aivanelabs/ai-rpa` on GitHub.
 
 The first public surface is **AIVane Android REPL Beta**: a lightweight Python CLI, public docs, examples, and sample skills that let AI agents inspect Android UI state and control a phone step by step over LAN.
 
 ## Current Status
 
 - The repo structure and public CLI are ready for evaluation.
-- The Android APK release channel is still being finalized.
-- Until the public APK download is posted, installation is handled through a private beta or shared release channel.
+- GitHub is the only official entry point for the beta.
+- APK builds are distributed through GitHub pre-releases.
 
 ## Who This Is For
 
@@ -63,6 +63,7 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 - `docs/`: quickstart, protocol, permissions, known limitations, feedback, release notes, and repo scope.
 - `examples/`: smoke flows and minimal usage examples.
 - `skills/agent-android/`: sample skill definition with prompts and agent metadata.
+- GitHub Releases: the only official place to download beta APK builds.
 
 ## Installation & Launch
 

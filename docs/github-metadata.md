@@ -25,7 +25,7 @@ AI mobile automation starter repo for AIVane. Public Android REPL beta, Python c
 
 ## Suggested Homepage
 
-- `https://aivane.net`
+- Leave `homepage` empty for now until the public site exists.
 
 ## Suggested Pinned Highlights
 

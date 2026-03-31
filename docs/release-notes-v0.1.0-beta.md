@@ -16,6 +16,6 @@
 
 - Improve public template examples for advanced `/api/execute` flows.
 - Improve screenshot retry experience when permission is denied.
-- Publish a signed APK on `aivane.net` download page once testing completes.
+- Publish beta APK builds through GitHub pre-releases and iterate on the release notes as testing continues.
 
 

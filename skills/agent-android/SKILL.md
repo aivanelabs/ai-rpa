@@ -7,7 +7,7 @@ description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher
 
 ## Overview
 
-Use this skill to drive an Android device through the public agent-android beta surface hosted on `aivane.net` under the `aivanelabs/ai-rpa` repo.
+Use this skill to drive an Android device through the public agent-android beta surface published in the `aivanelabs/ai-rpa` GitHub repo.
 
 This skill assumes:
 

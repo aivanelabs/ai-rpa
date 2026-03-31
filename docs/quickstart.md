@@ -1,6 +1,6 @@
 # Quickstart — agent-android
 
-This quickstart introduces the publicly staged CLI for AIVane (AI Mobile Automation) under `aivanelabs/ai-rpa` on `aivane.net`.
+This quickstart introduces the public GitHub beta for AIVane (AI Mobile Automation) under `aivanelabs/ai-rpa`.
 
 ## What You Need
 
