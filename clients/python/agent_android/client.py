@@ -256,6 +256,32 @@ class AgentAndroidClient:
                 return -1
         return -1
 
+    def _is_input_element(self, elem: Optional[Dict[str, Any]]) -> bool:
+        """Return whether the element is a direct text-input target."""
+        if not isinstance(elem, dict):
+            return False
+        cls = (elem.get("simpleClassName") or "").strip()
+        return bool(
+            elem.get("editable")
+            or elem.get("focusable")
+            or cls in {"EditText", "AutoCompleteTextView", "TextInputEditText"}
+        )
+
+    def _describe_tree_match(self, elem: Dict[str, Any], index: int, count: int) -> Dict[str, Any]:
+        return {
+            "index": index,
+            "count": count,
+            "refId": elem.get("refId"),
+            "text": elem.get("text"),
+            "contentDescription": elem.get("contentDescription") or elem.get("contentDesc"),
+            "className": elem.get("simpleClassName"),
+            "bounds": elem.get("bounds"),
+            "x": elem.get("x"),
+            "y": elem.get("y"),
+            "resourceId": elem.get("resourceId"),
+            "isInput": self._is_input_element(elem),
+        }
+
     def _get_xpath_match_count(self, xpath: str) -> Optional[int]:
         """Use the Android runtime evaluator to count XPath matches."""
         result = self._execute_template(
@@ -353,6 +379,38 @@ class AgentAndroidClient:
         if count == 1:
             info.update(self._describe_unique_xpath_match(xpath))
         return info
+
+    def describe_xpath_match(self, xpath: str, index: int = 0) -> Optional[Dict[str, Any]]:
+        """Describe one XPath match from the current UI tree."""
+        if index < 0:
+            return None
+        tree = self.get_ui_elements(force_refresh=True)
+        if not tree:
+            return None
+        matches = self.find_by_xpath_all(tree, xpath)
+        if index >= len(matches):
+            return None
+        return self._describe_tree_match(matches[index], index, len(matches))
+
+    def _resolve_xpath_input_target(
+        self, xpath: str
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[str]]:
+        """Resolve one XPath input target without guessing nearby editable fields."""
+        tree = self.get_ui_elements(force_refresh=True)
+        if not tree:
+            return None, None, "tree_unavailable"
+
+        matches = self.find_by_xpath_all(tree, xpath)
+        if not matches:
+            return None, None, "not_found"
+        if len(matches) != 1:
+            return None, None, "multiple_matches"
+
+        target = matches[0]
+        detail = self._describe_tree_match(target, 0, 1)
+        if not self._is_input_element(target):
+            return target, detail, "not_input"
+        return target, detail, None
 
     def get_ui_tree_xml(self, force_refresh: bool = False) -> Optional[str]:
         """Return the full accessibility UI tree XML."""
@@ -506,6 +564,14 @@ class AgentAndroidClient:
         target = self._resolve_action_target(refId)
         if not target:
             return False
+        if not self._is_input_element(target):
+            cls = target.get("simpleClassName") or "unknown"
+            print(
+                f"Input failed: refId={refId} resolved to non-input element "
+                f"class={cls}. Refusing to guess a nearby input field.",
+                file=sys.stderr,
+            )
+            return False
 
         elem_desc = target.get('text') or target.get('contentDesc') or f"refId={refId}"
         coords = self._get_coordinates(target, f"Element refId={refId}")
@@ -513,7 +579,8 @@ class AgentAndroidClient:
             return False
         x, y = coords
 
-        print(f"Inputting '{text}' to '{elem_desc}' (refId={refId}) at ({x}, {y})")
+        action = "Clearing" if clearFirst and text == "" else "Inputting"
+        print(f"{action} '{text}' to '{elem_desc}' (refId={refId}) at ({x}, {y})")
 
         return self._run_single_operation(
             template_id=f"input-refId-{refId}",
@@ -524,7 +591,11 @@ class AgentAndroidClient:
                 "value": text,
                 "clearFirst": clearFirst
             },
-            success_message=f"SUCCESS: Input '{text}' to element refId={refId}",
+            success_message=(
+                f"SUCCESS: Cleared element refId={refId}"
+                if clearFirst and text == ""
+                else f"SUCCESS: Input '{text}' to element refId={refId}"
+            ),
             failure_prefix="FAILED"
         )
 
@@ -713,15 +784,10 @@ class AgentAndroidClient:
             print(f"Unknown key: {key}. Available: {', '.join(key_map.keys())}", file=sys.stderr)
             return False
 
-        if op_type == "android.press.back":
-            template = {"templateId": "press-back", "operations": [
-                {"operationType": "android.press.back", "parameters": {}}]}
-        elif op_type == "android.press.home":
-            template = {"templateId": "press-home", "operations": [
-                {"operationType": "android.press.home", "parameters": {}}]}
-        else:
-            print(f"Key '{key}' not yet supported, please use --back for back key", file=sys.stderr)
-            return False
+        template = {
+            "templateId": f"press-{key.lower()}",
+            "operations": [{"operationType": op_type, "parameters": {}}],
+        }
 
         result = self._api_call(template)
         if result and result.get('success'):
@@ -823,11 +889,20 @@ class AgentAndroidClient:
         return [e for e in elements if e.get('resourceId') == resourceId]
 
     def find_by_text(self, elements: List[Dict], text: str) -> List[Dict]:
-        return [e for e in elements if text.lower() in (e.get('text', '') or '').lower()]
+        needle = text.lower()
+        matches: List[Dict] = []
+        for elem in elements:
+            haystacks = [
+                elem.get("text", ""),
+                elem.get("contentDesc", ""),
+                elem.get("contentDescription", ""),
+            ]
+            if any(needle in (value or "").lower() for value in haystacks):
+                matches.append(elem)
+        return matches
 
     def find_input_elements(self, elements: List[Dict]) -> List[Dict]:
-        return [e for e in elements if e.get('focusable') or e.get('editable') or
-                e.get('simpleClassName') in ['EditText', 'TextView']]
+        return [e for e in elements if self._is_input_element(e)]
 
     def find_by_xpath(self, elements: List[Dict], xpath: str) -> Optional[Dict]:
         """
@@ -1839,6 +1914,32 @@ class AgentAndroidClient:
 
     def input_by_xpath(self, xpath: str, text: str) -> bool:
         """Input text by XPath using Android runtime locator mode."""
+        _target, detail, reason = self._resolve_xpath_input_target(xpath)
+        if reason == "tree_unavailable":
+            print("FAILED: could not refresh the current UI tree before XPath input", file=sys.stderr)
+            return False
+        if reason == "not_found":
+            print(f"FAILED: XPath matched no elements: {xpath}", file=sys.stderr)
+            return False
+        if reason == "multiple_matches":
+            count = self._get_xpath_match_count(xpath)
+            if count is None:
+                count = -1
+            print(
+                f"FAILED: XPath matched {count if count >= 0 else 'multiple'} elements; "
+                "refine it to one input target.",
+                file=sys.stderr,
+            )
+            return False
+        if reason == "not_input":
+            cls = (detail or {}).get("className") or "unknown"
+            print(
+                f"FAILED: XPath resolved to non-input element class={cls}. "
+                "Refusing to guess a nearby input field.",
+                file=sys.stderr,
+            )
+            return False
+
         return self._run_single_operation(
             template_id="input-xpath",
             operation_type="android.element.input",
@@ -1847,6 +1948,10 @@ class AgentAndroidClient:
                 "value": text,
                 "clearFirst": True
             },
-            success_message=f"Input '{text}' to XPath [{xpath}]",
+            success_message=(
+                f"Cleared XPath [{xpath}]"
+                if text == ""
+                else f"Input '{text}' to XPath [{xpath}]"
+            ),
             failure_prefix="FAILED"
         )

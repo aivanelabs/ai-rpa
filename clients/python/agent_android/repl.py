@@ -5,7 +5,7 @@ import os
 import shlex
 import sys
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .client import AgentAndroidClient
 from .config import CONFIG_FILE_PATH, save_url_to_config
@@ -43,6 +43,7 @@ class AriaReplSession:
       id com.example:id/btn -> filter by resourceId
       ref 5                -> show refId=5 details
       x 5                  -> show XPath candidates for refId=5
+      vx //EditText[1] 0   -> inspect the first runtime match for an XPath
       raw                  -> toggle raw JSON output
       vars                 -> show session variables
       set url http://...   -> set the server URL
@@ -55,7 +56,7 @@ class AriaReplSession:
         ('l', 'list',          'List elements (reuse cache)'),
         ('ss', 'snapshot',     'Refresh the tree and list again'),
         ('hl', 'health',       'Check service health'),
-        ('f', 'find',          'Filter by text'),
+        ('f', 'find',          'Filter by text or content description'),
         ('id', None,           'Filter by resourceId'),
         ('ref', None,          'Show element details'),
         ('x', 'xpath',         'Show XPath candidates and match counts'),
@@ -66,7 +67,7 @@ class AriaReplSession:
         ('i', 'input',         'Input text (refId text)'),
         ('ix', 'inputx',       'Input text by XPath'),
         ('sw', 'swipe',        'Swipe (d/u/l/r)'),
-        ('p', 'press',         'Press a key (back/home/menu)'),
+        ('p', 'press',         'Press a key (back/home/menu/enter/delete/power)'),
         ('b', 'back',          'Press Back'),
         ('wf', 'waitfor',      'Wait for an element to appear'),
         ('g', 'get',           'Read an element attribute'),
@@ -86,7 +87,7 @@ class AriaReplSession:
         self._raw_output: bool = False            # Raw JSON output toggle
         self._timeout: int = 30                  # Default wait timeout in seconds
         self._prompt: str = "aria> "
-        self.variables: Dict[str, Any] = {}      # Session variables (LAST_XPATH, etc.)
+        self.variables: Dict[str, Any] = {}      # Session variables
 
         if _HAS_READLINE and history_file:
             try:
@@ -153,23 +154,22 @@ class AriaReplSession:
         cmd = first
         remainder = remainder.strip()
 
-        if cmd in ('vx', 'validatex', 'tx', 'tapx'):
+        if cmd in ('tx', 'tapx'):
+            return cmd, [remainder] if remainder else []
+
+        if cmd in ('vx', 'validatex'):
+            xpath, extra = self._split_xpath_expression(remainder)
+            if not xpath:
+                return cmd, []
+            if extra and extra.isdigit():
+                return cmd, [xpath, extra]
             return cmd, [remainder] if remainder else []
 
         if cmd in ('ix', 'inputx'):
-            if not remainder:
-                return cmd, []
-            if ' -- ' in remainder:
-                xpath, text = remainder.split(' -- ', 1)
-                xpath = xpath.strip()
-                text = text.strip()
-                return cmd, [xpath, text] if xpath and text else [xpath] if xpath else []
-            xpath, sep, text = remainder.rpartition(' ')
-            if sep:
-                xpath = xpath.strip()
-                text = text.strip()
-                return cmd, [xpath, text] if xpath and text else [remainder]
-            return cmd, [remainder]
+            return cmd, self._parse_xpath_input_args(remainder)
+
+        if cmd in ('i', 'input'):
+            return cmd, self._parse_ref_input_args(remainder)
 
         tokens = shlex.split(line, posix=False)
         if not tokens:
@@ -178,6 +178,66 @@ class AriaReplSession:
         args = tokens[1:]
 
         return cmd, args
+
+    def _split_xpath_expression(self, remainder: str) -> Tuple[str, str]:
+        """Split '<xpath> <rest>' without breaking spaces inside predicates."""
+        text = remainder.strip()
+        if not text:
+            return '', ''
+
+        depth = 0
+        in_quote: Optional[str] = None
+        for index, ch in enumerate(text):
+            if in_quote is not None:
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ("'", '"'):
+                in_quote = ch
+                continue
+            if ch == '[':
+                depth += 1
+                continue
+            if ch == ']':
+                depth = max(0, depth - 1)
+                continue
+            if ch.isspace() and depth == 0:
+                return text[:index].strip(), text[index + 1:].strip()
+        return text, ''
+
+    def _parse_xpath_input_args(self, remainder: str) -> List[str]:
+        remainder = remainder.strip()
+        if not remainder:
+            return []
+        if remainder.endswith(' --'):
+            xpath = remainder[:-3].strip()
+            return [xpath, ''] if xpath else []
+        if ' -- ' in remainder:
+            xpath, text = remainder.split(' -- ', 1)
+            xpath = xpath.strip()
+            return [xpath, text] if xpath else []
+        xpath, text = self._split_xpath_expression(remainder)
+        if not xpath:
+            return []
+        if not text:
+            return [xpath]
+        return [xpath, text]
+
+    def _parse_ref_input_args(self, remainder: str) -> List[str]:
+        remainder = remainder.strip()
+        if not remainder:
+            return []
+        ref_id, sep, text = remainder.partition(' ')
+        if not sep:
+            return [ref_id]
+        return [ref_id, text]
+
+    def _decode_input_payload(self, raw_text: str) -> str:
+        if raw_text == '--clear':
+            return ''
+        if raw_text in {'""', "''"}:
+            return ''
+        return raw_text
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -343,7 +403,7 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _cmd_find(self, args: List[str]) -> bool:
-        """f [text] - filter elements by text."""
+        """f [text] - filter elements by text or content description."""
         if not args:
             self._print_error("Usage: f <text>")
             return False
@@ -394,9 +454,9 @@ class AriaReplSession:
         return True
 
     def _cmd_xpath(self, args: List[str]) -> bool:
-        """x <N> [idx] - show XPath candidates validated by Android runtime match counts."""
-        if not args or not args[0].isdigit():
-            self._print_error("Usage: x <refId> [candidate-index]")
+        """x <N> - show XPath candidates validated by Android runtime match counts."""
+        if len(args) != 1 or not args[0].isdigit():
+            self._print_error("Usage: x <refId>")
             return False
         refId = int(args[0])
         tree = self._ensure_tree()
@@ -424,9 +484,9 @@ class AriaReplSession:
         if runtime_absolute:
             runtime_count = runtime_absolute_info.get('count') if runtime_absolute_info else '?'
             print(f"  Runtime absolute path: {runtime_absolute}  (match={runtime_count})")
-        print(f"  {'─' * 60}")
+        print(f"  {'-' * 60}")
         print(f"  {'Idx':<4} {'Runtime':<10} {'XPath'}")
-        print(f"  {'─' * 60}")
+        print(f"  {'-' * 60}")
 
         for i, (xp, count, strategy, info) in enumerate(candidates):
             badge = ''
@@ -444,7 +504,7 @@ class AriaReplSession:
                 summary = info.get('text') or info.get('contentDescription') or '-'
                 print(f"      -> {info.get('className') or '-'} | {summary!r}")
 
-        print(f"  {'─' * 60}")
+        print(f"  {'-' * 60}")
         best = candidates[0]
         if best[1] == 1:
             print(f"  Recommended: {best[0]}")
@@ -456,28 +516,13 @@ class AriaReplSession:
             print(f"  Warning: best candidate matched {best[1]} elements at runtime and may not be unique")
             print(f"     recommended: {best[0]}")
 
-        if len(args) >= 2 and args[1].isdigit():
-            idx = int(args[1])
-            if 0 <= idx < len(candidates):
-                chosen = candidates[idx]
-                print(f"\n  Using [{idx}] {chosen[0]}")
-                print(f"  Strategy: {chosen[2]}, runtime matched {chosen[1]} elements")
-                if chosen[1] > 1:
-                    print(f"  [!] Warning: this XPath matches {chosen[1]} elements at runtime, so tapping may be imprecise")
-                self.variables['LAST_XPATH'] = chosen[0]
-                self.variables['LAST_XPATH_COUNT'] = chosen[1]
-                self.variables['LAST_XPATH_STRATEGY'] = chosen[2]
-                self.variables['LAST_XPATH_RUNTIME'] = chosen[3]
-            else:
-                print(f"  [!] Candidate index {idx} is out of range (0-{len(candidates)-1})")
-        else:
-            self.variables['LAST_XPATH'] = best[0]
-            self.variables['LAST_XPATH_COUNT'] = best[1]
-            self.variables['LAST_XPATH_STRATEGY'] = best[2]
-            self.variables['LAST_XPATH_RUNTIME'] = best[3]
         self.variables['LAST_UI_TREE_ABSOLUTE_XPATH'] = ui_tree_absolute
         self.variables['LAST_RUNTIME_ABSOLUTE_XPATH'] = runtime_absolute
         self.variables['LAST_RUNTIME_ABSOLUTE_INFO'] = runtime_absolute_info
+        self.variables.pop('LAST_XPATH', None)
+        self.variables.pop('LAST_XPATH_COUNT', None)
+        self.variables.pop('LAST_XPATH_STRATEGY', None)
+        self.variables.pop('LAST_XPATH_RUNTIME', None)
         return True
 
     def _cmd_x(self, args: List[str]) -> bool:
@@ -520,7 +565,7 @@ class AriaReplSession:
             print(f"     strategy: {strategy}, runtime matched {count} elements")
             print(f"  Tap refused - the XPath is not unique enough and may hit the wrong element")
             print(f"  ")
-            print(f"  Tip: use 'x {refId}' to inspect all candidates, or 'x {refId} <index>' to choose a non-unique XPath")
+            print(f"  Tip: use 'x {refId}' to inspect all candidates, or 'vx <xpath> <index>' to inspect one runtime match")
             return False
 
         ok = self.client.tap_by_xpath(xp)
@@ -533,11 +578,17 @@ class AriaReplSession:
         return self._cmd_xx(args)
 
     def _cmd_validatex(self, args: List[str]) -> bool:
-        """vx <xpath> - validate an XPath at runtime."""
+        """vx <xpath> [idx] - validate an XPath at runtime and optionally inspect one match."""
         if not args:
-            self._print_error("Usage: vx <xpath>")
+            self._print_error("Usage: vx <xpath> [idx]")
             return False
-        xpath = ' '.join(args)
+        xpath = args[0]
+        detail_index: Optional[int] = None
+        if len(args) >= 2:
+            if not args[1].isdigit():
+                self._print_error("Usage: vx <xpath> [idx]")
+                return False
+            detail_index = int(args[1])
         info = self.client.validate_xpath_runtime(xpath)
         if not info:
             print(f"  [!] Runtime validation failed: {xpath}")
@@ -545,11 +596,22 @@ class AriaReplSession:
 
         print(f"  XPath: {xpath}")
         print(f"  Runtime match count: {info.get('count')}")
-        if info.get('count') == 1:
-            print(f"  Class: {info.get('className') or '-'}")
-            print(f"  Text:  {info.get('text') or '-'}")
-            print(f"  Desc:  {info.get('contentDescription') or '-'}")
-            print(f"  Bounds:{info.get('bounds') or '-'}")
+        if detail_index is None and info.get('count') == 1:
+            detail_index = 0
+        if detail_index is not None:
+            detail = self.client.describe_xpath_match(xpath, detail_index)
+            if not detail:
+                print(f"  [!] Match index {detail_index} is out of range")
+                return False
+            print(f"  Match[{detail_index}] refId: {detail.get('refId') if detail.get('refId') is not None else '-'}")
+            print(f"  Class:  {detail.get('className') or '-'}")
+            print(f"  Text:   {detail.get('text') or '-'}")
+            print(f"  Desc:   {detail.get('contentDescription') or '-'}")
+            print(f"  Bounds: {detail.get('bounds') or '-'}")
+            print(f"  Center: ({detail.get('x')}, {detail.get('y')})")
+            print(f"  Input:  {'yes' if detail.get('isInput') else 'no'}")
+        elif info.get('count', 0) > 1:
+            print("  Tip: append an index to inspect one match, for example: vx <xpath> 0")
         return True
 
     def _cmd_vx(self, args: List[str]) -> bool:
@@ -573,12 +635,15 @@ class AriaReplSession:
         return self._cmd_tap(args)
 
     def _cmd_input(self, args: List[str]) -> bool:
-        """i <refId> <text> - input text into an element."""
+        """i <refId> <text|--clear> - input text into an element."""
         if len(args) < 2 or not args[0].isdigit():
-            self._print_error("Usage: i <refId> <text>")
+            self._print_error("Usage: i <refId> <text|--clear>")
+            self._print_error("  Example: i 5 hello world")
+            self._print_error("  Example: i 5 --clear")
+            self._print_error('  Example: i 5 ""')
             return False
         refId = int(args[0])
-        text = ' '.join(args[1:])
+        text = self._decode_input_payload(' '.join(args[1:]))
         ok = self.client.input_to_element(refId, text)
         if ok:
             self._invalidate_tree()
@@ -605,13 +670,16 @@ class AriaReplSession:
         return self._cmd_tapx(args)
 
     def _cmd_inputx(self, args: List[str]) -> bool:
-        """ix <xpath> <text> - input text into a field by XPath."""
+        """ix <xpath> <text|--clear> - input text into a field by XPath."""
         if len(args) < 2:
-            self._print_error("Usage: ix <xpath> <text>")
+            self._print_error("Usage: ix <xpath> <text|--clear>")
             self._print_error("  Example: ix //EditText[@text='Search'] hello")
+            self._print_error("  Example: ix //EditText[@text='Search'] -- hello world")
+            self._print_error("  Example: ix //EditText[@text='Search'] --")
+            self._print_error("  Example: ix //EditText[@text='Search'] --clear")
             return False
         xpath = args[0]
-        text = ' '.join(args[1:])
+        text = self._decode_input_payload(' '.join(args[1:]))
         ok = self.client.input_by_xpath(xpath, text)
         if ok:
             self._invalidate_tree()
@@ -649,9 +717,9 @@ class AriaReplSession:
         return self._cmd_swipe(args)
 
     def _cmd_press(self, args: List[str]) -> bool:
-        """p <key> - press a key (back/home/menu)."""
+        """p <key> - press a key (back/home/menu/enter/delete/power)."""
         if not args:
-            self._print_error("Usage: p <back|home|menu>")
+            self._print_error("Usage: p <back|home|menu|enter|delete|power>")
             return False
         ok = self.client.press_key(args[0])
         if ok:
@@ -694,7 +762,7 @@ class AriaReplSession:
         if elem:
             print(f"  ✓ Found refId={elem.get('refId')}: "
                   f"text={elem.get('text', '')!r} "
-                  f"at ({elem.get('x')}, {elem.get('y')})")
+                  f"at center=({elem.get('x')}, {elem.get('y')})")
             self._invalidate_tree()
             return True
         else:
@@ -834,38 +902,40 @@ class AriaReplSession:
         lines = [
             "",
             "  agent-android REPL v5.4 - Command Reference",
-            "  ─" + "─" * 66,
+            "  " + "-" * 67,
             "",
             "  Browse",
             "    health            Check the /health endpoint",
-            "    l [n]             List elements (show the first n entries, reuse cache)",
+            "    l [n]             List elements (show the first n entries, center coordinates, reuse cache)",
             "    ss                Refresh the tree and list again (force refresh)",
-            "    f <text>          Filter elements by text",
+            "    f <text>          Filter elements by text or content description",
             "    id <resourceId>   Filter by resourceId",
-            "    ref <N>           Show detailed information for refId=N",
-            "    x <N> [idx]       Show XPath candidates for refId=N (validated by runtime match count)",
-            "                       Use 'x <N> <idx>' to select a specific candidate and store it as LAST_XPATH",
-            "    xx <N>            Tap via a unique XPath candidate automatically (refuses non-unique candidates)",
-            "    vx <xpath>        Validate the runtime match count for an XPath",
+            "    ref <refId>       Show detailed information for refId",
+            "    x <refId>         Show XPath candidates for refId (validated by runtime match count)",
+            "    xx <refId>        Tap via a unique XPath candidate automatically (refuses non-unique candidates)",
+            "    vx <xpath> [idx]  Validate the runtime match count for an XPath",
+            "                       Use 'vx <xpath> <idx>' to inspect one runtime match in detail",
             "",
             "  Interact",
-            "    t <N>             Tap the element with refId=N",
+            "    t <refId>         Tap the element with refId using its center point",
             "    tx <xpath>        Tap an element by XPath",
             "                       Example: tx //Button[@text='Search']",
             "                       Example: tx //EditText[@text='Search']",
-            "    i <N> <text>      Input text into refId=N",
+            "    i <refId> <text>  Input text into refId",
+            "                       Use '--clear' or an empty string ('\"\"') to clear the field",
             "    ix <xpath> <text> Input text by XPath",
+            "                       Use '--clear' or 'ix <xpath> --' to clear the field",
             "                       Example: ix //EditText[@text='Search'] hello",
             "    sw <d|u|l|r> [--dur N] [--dist N]",
             "                       Swipe (d=down, u=up, l=left, r=right)",
-            "    p <key>           Press a key (back/home/menu)",
+            "    p <key>           Press a key (back/home/menu/enter/delete/power)",
             "    b                  Press Back",
             "",
             "  Wait",
-            "    wf <text> [--t N]  Wait for an element to appear (default timeout: 30s)",
+            "    wf <text> [--t N] Wait for an element to appear (default timeout: 30s)",
             "",
             "  Info",
-            "    g <N> <attr>     Read an attribute from refId=N",
+            "    g <refId> <attr> Read an attribute from refId",
             "                       (text/class/bounds/x/y/xpath/selector/...)",
             "    s [path]          Capture a screenshot (no argument = auto filename)",
             "    la <package>      Launch an app (for example com.xingin.xhs)",

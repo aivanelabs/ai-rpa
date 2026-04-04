@@ -21,23 +21,23 @@ Usage:
 
 REPL quick reference:
     health        Check the /health endpoint
-    l [n]         List elements (first n entries, reuse cache)
+    l [n]         List elements (first n entries, center coordinates, reuse cache)
     ss            Refresh the UI tree snapshot (force refresh)
-    t <N>         Tap element with refId=N
+    t <N>         Tap element with refId=N using its center point
     tx <xpath>    Tap by XPath locator (runtime evaluation)
-    i <N> <text>  Enter text into refId=N
-    ix <xpath> <text> Enter text via XPath locator
-    vx <xpath>    Validate XPath match count in runtime layout
+    i <N> <text>  Enter text into refId=N (--clear or "" clears it)
+    ix <xpath> <text> Enter text via XPath locator (--clear or 'ix <xpath> --' clears it)
+    vx <xpath> [idx] Validate XPath match count and optionally inspect one runtime match
     sw <d>        Swipe direction (d/u/l/r, supports --dur/--dist)
     wf <text>     Wait for element text (use --t to override timeout)
     g <N> <attr>  Inspect attribute value for refId=N
     s [path]      Capture screenshot
     la <pkg>      Launch an app by package name
     b             Navigate back
-    p <key>       Press a system key (back/home)
+    p <key>       Press a system key (back/home/menu/enter/delete/power)
     ref <N>       Dump element details
-    x <N>         Print XPath for refId=N
-    f <text>      Filter tree elements by visible text
+    x <N>         Print XPath candidates for refId=N
+    f <text>      Filter tree elements by text or content description
     id <resourceId> Filter elements by resourceId
     h             Show help
     q             Quit the REPL
@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--health", action="store_true", help="Check service health from /health")
     group.add_argument("--back", action="store_true", help="Press back button")
     group.add_argument("--apps", action="store_true", help="List launcher apps from /api/apps")
-    group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / menu / enter")
+    group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / menu / enter / delete / power")
     group.add_argument("--get-attr", nargs=2, metavar=("REFID", "ATTR"), help="Get element attribute by refId (text/className/bounds/...)")
     group.add_argument("--refId", "-r", type=int, metavar="N", help="Get element details")
     group.add_argument("--xpath", "-x", type=int, metavar="N", help="Get element XPath")
@@ -82,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--duration", type=int, default=300, help="Swipe duration in ms (default: 300)")
     parser.add_argument("--distance", type=float, default=0.5, help="Swipe distance ratio 0.0-1.0 (default: 0.5)")
     parser.add_argument("--quality", "-q", type=int, default=80, help="Screenshot quality 1-100 (default: 80)")
-    parser.add_argument("--filter", "-f", type=str, help="Filter elements by text")
+    parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
     return parser

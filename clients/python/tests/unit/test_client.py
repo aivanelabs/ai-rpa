@@ -165,6 +165,19 @@ def test_wait_for_element_retries_until_text_match_is_found(client, monkeypatch)
     assert found["refId"] == 2
 
 
+def test_find_by_text_matches_text_and_content_description_fields(client):
+    elements = [
+        {"refId": 1, "text": "Search", "contentDesc": "", "contentDescription": ""},
+        {"refId": 2, "text": "", "contentDesc": "Search icon", "contentDescription": ""},
+        {"refId": 3, "text": "", "contentDesc": "", "contentDescription": "Search hint"},
+        {"refId": 4, "text": "Other", "contentDesc": "", "contentDescription": ""},
+    ]
+
+    matches = client.find_by_text(elements, "search")
+
+    assert [elem["refId"] for elem in matches] == [1, 2, 3]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -179,6 +192,145 @@ def test_wait_for_element_retries_until_text_match_is_found(client, monkeypatch)
 )
 def test_parse_match_count_handles_common_runtime_shapes(client, value, expected):
     assert client._parse_match_count(value) == expected
+
+
+def test_describe_xpath_match_returns_selected_match_details(client, monkeypatch):
+    tree = [
+        {
+            "refId": 7,
+            "text": "Search",
+            "contentDesc": "Search box",
+            "simpleClassName": "EditText",
+            "bounds": "[0,0][100,50]",
+            "x": 50,
+            "y": 25,
+            "resourceId": "pkg:id/search",
+            "editable": True,
+            "xpath": "//EditText[@text='Search']",
+        }
+    ]
+    monkeypatch.setattr(client, "get_ui_elements", lambda *args, **kwargs: tree)
+
+    detail = client.describe_xpath_match("//EditText[@text='Search']", 0)
+
+    assert detail == {
+        "index": 0,
+        "count": 1,
+        "refId": 7,
+        "text": "Search",
+        "contentDescription": "Search box",
+        "className": "EditText",
+        "bounds": "[0,0][100,50]",
+        "x": 50,
+        "y": 25,
+        "resourceId": "pkg:id/search",
+        "isInput": True,
+    }
+
+
+def test_input_by_xpath_rejects_non_input_match(client, monkeypatch, capsys):
+    tree = [
+        {
+            "refId": 9,
+            "text": "Search",
+            "contentDesc": "",
+            "simpleClassName": "TextView",
+            "bounds": "[0,0][100,50]",
+            "x": 50,
+            "y": 25,
+            "xpath": "//TextView[@text='Search']",
+        }
+    ]
+    monkeypatch.setattr(client, "get_ui_elements", lambda *args, **kwargs: tree)
+    monkeypatch.setattr(client, "_run_single_operation", lambda *args, **kwargs: pytest.fail("should not submit input"))
+
+    assert client.input_by_xpath("//TextView[@text='Search']", "hello") is False
+    assert "Refusing to guess a nearby input field" in capsys.readouterr().err
+
+
+def test_input_by_xpath_rejects_ambiguous_matches(client, monkeypatch, capsys):
+    tree = [
+        {
+            "refId": 1,
+            "text": "Search",
+            "contentDesc": "",
+            "simpleClassName": "EditText",
+            "editable": True,
+            "xpath": "//EditText[@text='Search']",
+        },
+        {
+            "refId": 2,
+            "text": "Search",
+            "contentDesc": "",
+            "simpleClassName": "EditText",
+            "editable": True,
+            "xpath": "//EditText[@text='Search']",
+        },
+    ]
+    monkeypatch.setattr(client, "get_ui_elements", lambda *args, **kwargs: tree)
+    monkeypatch.setattr(client, "_get_xpath_match_count", lambda _xpath: 2)
+    monkeypatch.setattr(client, "_run_single_operation", lambda *args, **kwargs: pytest.fail("should not submit input"))
+
+    assert client.input_by_xpath("//EditText[@text='Search']", "hello") is False
+    assert "matched 2 elements" in capsys.readouterr().err
+
+
+def test_input_to_element_rejects_non_input_refid(client, monkeypatch, capsys):
+    monkeypatch.setattr(
+        client,
+        "_resolve_action_target",
+        lambda _ref_id: {"refId": 4, "simpleClassName": "Button", "x": 1, "y": 2},
+    )
+    monkeypatch.setattr(client, "_run_single_operation", lambda *args, **kwargs: pytest.fail("should not submit input"))
+
+    assert client.input_to_element(4, "hello") is False
+    assert "resolved to non-input element" in capsys.readouterr().err
+
+
+def test_input_by_xpath_allows_clearing_input(client, monkeypatch):
+    tree = [
+        {
+            "refId": 1,
+            "text": "Search",
+            "contentDesc": "",
+            "simpleClassName": "EditText",
+            "editable": True,
+            "bounds": "[0,0][100,50]",
+            "x": 50,
+            "y": 25,
+            "xpath": "//EditText[@text='Search']",
+        }
+    ]
+    monkeypatch.setattr(client, "get_ui_elements", lambda *args, **kwargs: tree)
+    calls = []
+
+    def fake_run_single_operation(*_args, **kwargs):
+        calls.append(kwargs)
+        return True
+
+    monkeypatch.setattr(client, "_run_single_operation", fake_run_single_operation)
+
+    assert client.input_by_xpath("//EditText[@text='Search']", "") is True
+    assert calls[0]["parameters"]["value"] == ""
+    assert calls[0]["success_message"] == "Cleared XPath [//EditText[@text='Search']]"
+
+
+def test_press_key_supports_menu(client, monkeypatch):
+    templates = []
+
+    def fake_api_call(template):
+        templates.append(template)
+        return {"success": True}
+
+    monkeypatch.setattr(client, "_api_call", fake_api_call)
+
+    assert client.press_key("menu") is True
+    assert templates == [
+        {
+            "templateId": "press-menu",
+            "operations": [{"operationType": "android.press.menu", "parameters": {}}],
+        }
+    ]
 
 
 def test_screenshot_writes_output_file_from_base64_payload(client, monkeypatch, tmp_path):
