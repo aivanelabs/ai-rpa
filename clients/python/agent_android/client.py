@@ -19,12 +19,13 @@ from .transport import _build_http_opener
 class AgentAndroidClient:
     """Client for the AIVane Android REPL public API."""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, token: Optional[str] = None):
         trimmed = base_url.strip()
         if not trimmed:
             raise ValueError("Base URL is required")
         self.base_url = trimmed.rstrip('/')
-        self.execute_url = f"{self.base_url}/api/execute"
+        self.token = token.strip() if isinstance(token, str) and token.strip() else None
+        self.execute_url = f"{self.base_url}/execute"
         self._opener = _build_http_opener(self.base_url)
         self._local_tree: Optional[List[Dict]] = None  # In-process UI tree cache
         self._ui_tree_xml_cache: Optional[str] = None
@@ -34,6 +35,47 @@ class AgentAndroidClient:
     # ---------------------------------------------------------------------------
     # ---------------------------------------------------------------------------
 
+    def _describe_transport_error(self, exc: Exception) -> str:
+        """Return a short human-readable transport error summary."""
+        if isinstance(exc, urllib.error.HTTPError):
+            return f"HTTP {exc.code} {exc.reason}"
+        if isinstance(exc, urllib.error.URLError):
+            reason = exc.reason
+            if isinstance(reason, TimeoutError):
+                return "request timed out"
+            if isinstance(reason, OSError):
+                return reason.strerror or str(reason)
+            if reason:
+                return str(reason)
+        return str(exc)
+
+    def _print_transport_error(self, action: str, url: str, exc: Exception) -> None:
+        """Print a consistent, actionable transport failure message."""
+        print(f"{action} {url} failed: {self._describe_transport_error(exc)}", file=sys.stderr)
+
+        if isinstance(exc, urllib.error.HTTPError):
+            return
+
+        print("Check these items before retrying:", file=sys.stderr)
+        print("  - Confirm the AIVane app is still open on the phone; the local API service may have exited.", file=sys.stderr)
+        print(f"  - Retry the local health check: curl {self.base_url}/health", file=sys.stderr)
+        print("  - Confirm the phone and computer are still on the same LAN and the IP/port is still correct.", file=sys.stderr)
+
+    def _build_headers(
+        self,
+        *,
+        content_type: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, str]:
+        headers = {"Accept": "application/json"}
+        if content_type:
+            headers["Content-Type"] = content_type
+        if user_agent:
+            headers["User-Agent"] = user_agent
+        if self.token:
+            headers["x-api-token"] = self.token
+        return headers
+
     def _api_call(self, template: Dict) -> Optional[Dict]:
         """Send an API request."""
         try:
@@ -41,20 +83,21 @@ class AgentAndroidClient:
             req = urllib.request.Request(
                 self.execute_url,
                 data=data,
-                headers={
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+                headers=self._build_headers(content_type="application/json"),
                 method='POST'
             )
             with self._opener.open(req, timeout=30) as response:
                 return json.loads(response.read().decode('utf-8'))
         except urllib.error.URLError as e:
-            print(f"Connection error: {e}", file=sys.stderr)
+            self._print_transport_error("POST", self.execute_url, e)
             return None
         except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
+            print(f"POST {self.execute_url} failed: {e}", file=sys.stderr)
             return None
+
+    def execute_template_payload(self, payload: Dict[str, Any]) -> Optional[Dict]:
+        """Execute a raw template payload via /execute."""
+        return self._api_call(payload)
 
     def _get_raw(self, path: str, params: Dict = None) -> Optional[Dict]:
         """Send a GET request for endpoints such as /health, /screenshot, and /download."""
@@ -64,21 +107,21 @@ class AgentAndroidClient:
         try:
             req = urllib.request.Request(
                 url,
-                headers={
-                    'Accept': 'application/json',
-                    'User-Agent': 'agent-android.py/0.1'
-                }
+                headers=self._build_headers(user_agent="agent-android.py/0.1")
             )
             with self._opener.open(req, timeout=30) as response:
                 content = response.read()
                 return json.loads(content.decode('utf-8'))
+        except urllib.error.URLError as e:
+            self._print_transport_error("GET", url, e)
+            return None
         except Exception as e:
-            print(f"GET {url} error: {e}", file=sys.stderr)
+            print(f"GET {url} failed: {e}", file=sys.stderr)
             return None
 
     def list_launcher_apps(self) -> Optional[List[Dict[str, Any]]]:
-        """Retrieve the launcher app list from /api/apps."""
-        result = self._get_raw("/api/apps")
+        """Retrieve the launcher app list from /apps."""
+        result = self._get_raw("/apps")
         if not result:
             return None
         if result.get('success') is False:
@@ -109,8 +152,11 @@ class AgentAndroidClient:
         try:
             with self._opener.open(url, timeout=60) as response:
                 return response.read()
+        except urllib.error.URLError as e:
+            self._print_transport_error("DOWNLOAD", url, e)
+            return None
         except Exception as e:
-            print(f"Download error: {e}", file=sys.stderr)
+            print(f"DOWNLOAD {url} failed: {e}", file=sys.stderr)
             return None
 
     def _execute_single_operation(self, template_id: str, operation_type: str,
@@ -141,7 +187,7 @@ class AgentAndroidClient:
         return self._api_call(template)
 
     def _get_outputs(self, result: Optional[Dict]) -> Dict[str, Any]:
-        """Extract the outputs block from a successful /api/execute response."""
+        """Extract the outputs block from a successful /execute response."""
         if not result or not result.get('success'):
             return {}
         outputs = result.get('data', {}).get('outputs', {})

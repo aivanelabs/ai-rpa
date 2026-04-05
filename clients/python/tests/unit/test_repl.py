@@ -8,8 +8,9 @@ from agent_android import repl as repl_module
 
 
 class _DummyClient:
-    def __init__(self, url):
+    def __init__(self, url, token=None):
         self.base_url = url
+        self.token = token
         self._local_tree = None
         self.input_calls = []
         self.input_xpath_calls = []
@@ -139,11 +140,13 @@ def test_execute_line_reports_unknown_command(session, capsys):
 def test_cmd_set_url_replaces_client_and_persists_value(session, monkeypatch, capsys):
     saved_urls = []
     monkeypatch.setattr(repl_module, "save_url_to_config", lambda url: saved_urls.append(url))
+    session.client.token = "saved-token"
 
     assert session._cmd_set(["url", " http://new-device:8080 "]) is True
 
     captured = capsys.readouterr()
     assert session.client.base_url == "http://new-device:8080"
+    assert session.client.token == "saved-token"
     assert saved_urls == ["http://new-device:8080"]
     assert "URL set to: http://new-device:8080" in captured.out
 
@@ -160,6 +163,31 @@ def test_cmd_set_rejects_empty_url(session, capsys):
     assert session._cmd_set(["url", "   "]) is False
 
     assert "URL cannot be empty" in capsys.readouterr().err
+
+
+def test_cmd_set_token_updates_client_and_persists_value(session, monkeypatch, capsys):
+    saved_tokens = []
+    monkeypatch.setattr(repl_module, "save_token_to_config", lambda token: saved_tokens.append(token))
+
+    assert session._cmd_set(["token", " shared-secret "]) is True
+
+    captured = capsys.readouterr()
+    assert session.client.token == "shared-secret"
+    assert saved_tokens == ["shared-secret"]
+    assert "Token set for protected API access" in captured.out
+
+
+def test_cmd_set_token_clear_removes_saved_token(session, monkeypatch, capsys):
+    saved_tokens = []
+    monkeypatch.setattr(repl_module, "save_token_to_config", lambda token: saved_tokens.append(token))
+    session.client.token = "old-token"
+
+    assert session._cmd_set(["token", "--clear"]) is True
+
+    captured = capsys.readouterr()
+    assert session.client.token is None
+    assert saved_tokens == [None]
+    assert "Token cleared" in captured.out
 
 
 def test_cmd_health_prints_health_payload(session, capsys):
@@ -232,3 +260,4 @@ def test_help_text_matches_current_xpath_and_press_usage(session, capsys):
     assert "x <N>" not in captured.out
     assert "p <key>           Press a key (back/home/menu/enter/delete/power)" in captured.out
     assert "Press a key (back/home/menu)" not in captured.out
+    assert "set token <value>  Save the shared token (--clear to remove it)" in captured.out

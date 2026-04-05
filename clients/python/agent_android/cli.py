@@ -7,55 +7,80 @@ import sys
 from typing import Any, Dict, List
 
 from .client import AgentAndroidClient
-from .config import require_base_url
+from .config import TOKEN_ENV_VAR, require_base_url, resolve_api_token
 from .formatting import _format_launcher_app, format_element, print_tree
 from .repl import AriaReplSession
 
 EPILOG = """AIVane Android REPL CLI helper for agent-android.
 
-Cross-platform command line client for Linux, macOS, and Windows.
+The phone hosts the beta HTTP service locally and this client connects
+directly to http://<device-ip>:8080. The public path is local-first and
+does not require a cloud relay for the basic smoke flow.
 
-Usage:
-    python agent-android.py --repl            # Enter the interactive REPL (recommended)
-    python agent-android.py --list            # Run a one-off command (compatibility mode)
+Quick start:
+    python agent-android.py --repl --url http://<device-ip>:8080
+    python agent-android.py --health --url http://<device-ip>:8080
+    python agent-android.py --health --url http://<device-ip>:8080 --token YOUR_TOKEN
+    python agent-android.py --apps --url http://<device-ip>:8080
+    python agent-android.py --list --url http://<device-ip>:8080
+
+One-off examples:
+    python agent-android.py --launch com.example.app --url http://<device-ip>:8080
+    python agent-android.py --tap 7 --url http://<device-ip>:8080
+    python agent-android.py --input 7 "hello world" --url http://<device-ip>:8080
+    python agent-android.py --template template.json --url http://<device-ip>:8080
+    python agent-android.py --swipe up --url http://<device-ip>:8080
+    python agent-android.py --screenshot --url http://<device-ip>:8080
+    python agent-android.py --wait-for Search --timeout 30 --url http://<device-ip>:8080
 
 REPL quick reference:
-    health        Check the /health endpoint
-    l [n]         List elements (first n entries, center coordinates, reuse cache)
-    ss            Refresh the UI tree snapshot (force refresh)
-    t <N>         Tap element with refId=N using its center point
-    tx <xpath>    Tap by XPath locator (runtime evaluation)
-    i <N> <text>  Enter text into refId=N (--clear or "" clears it)
-    ix <xpath> <text> Enter text via XPath locator (--clear or 'ix <xpath> --' clears it)
-    vx <xpath> [idx] Validate XPath match count and optionally inspect one runtime match
-    sw <d>        Swipe direction (d/u/l/r, supports --dur/--dist)
-    wf <text>     Wait for element text (use --t to override timeout)
-    g <N> <attr>  Inspect attribute value for refId=N
-    s [path]      Capture screenshot
-    la <pkg>      Launch an app by package name
-    b             Navigate back
-    p <key>       Press a system key (back/home/menu/enter/delete/power)
-    ref <N>       Dump element details
-    x <N>         Print XPath candidates for refId=N
-    f <text>      Filter tree elements by text or content description
-    id <resourceId> Filter elements by resourceId
-    h             Show help
-    q             Quit the REPL
-    vars          Show session variables
-    set url <u>   Switch the server URL
-    set timeout <N> Adjust the default timeout
-"""
+    health / hl               Check the /health endpoint
+    l [n] / list [n]          List elements (reuse cache)
+    ss / snapshot             Force-refresh the UI tree
+    apps                      List launcher apps
+    ref <N>                   Dump one element
+    x <N>                     Print XPath candidates for refId=N
+    vx <xpath> [idx]          Validate XPath match count and inspect one runtime match
+    t <N>                     Tap element with refId=N
+    tx <xpath>                Tap by XPath locator
+    i <N> <text>              Enter text into refId=N (--clear or "" clears it)
+    ix <xpath> <text>         Enter text via XPath locator
+    sw <d|u|l|r>              Swipe direction (supports --dur/--dist)
+    wf <text>                 Wait for element text (use --t to override timeout)
+    g <N> <attr>              Inspect an attribute for refId=N
+    s [path]                  Capture screenshot
+    la <pkg>                  Launch an app by package name
+    p <key>                   Press a system key
+    b                         Navigate back
+    vars                      Show session variables
+    set url <u>               Switch the server URL
+    set token <v>             Save or clear the shared token
+    set timeout <N>           Adjust the default timeout
+    h                         Show REPL help
+    q                         Quit the REPL
+
+Token:
+    If the phone requires a shared token, use one of:
+    - --token YOUR_TOKEN
+    - Set environment variable {env_var}
+    - In REPL: set token YOUR_TOKEN
+
+Troubleshooting:
+    If Python calls stop working, first check whether the AIVane app or
+    the phone-side API service has exited, then retry /health.
+""".format(env_var=TOKEN_ENV_VAR)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="agent-android v0.1 - Android UI Automation + following-sibling:: axis",
+        description="agent-android v0.1 - local-first Android UI automation over the public AIVane REPL surface",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=EPILOG,
     )
 
     parser.add_argument("--repl", "-i", action="store_true", help="Enter REPL interactive mode (recommended)")
     parser.add_argument("--url", "-u", default=None, help="AIVane server URL (command-line overrides saved config)")
+    parser.add_argument("--token", default=None, help=f"Shared token for protected device access. Overrides {TOKEN_ENV_VAR} and saved config.")
     parser.add_argument("--wait", "-w", type=int, default=0, help="Wait N seconds before fetching ARIA tree")
     parser.add_argument("--no-cache", action="store_true", help="Force refresh ARIA tree (bypass cache)")
     parser.add_argument("--wait-for", type=str, metavar="TEXT", help="Wait for element with text matching to appear")
@@ -67,10 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--swipe", type=str, metavar="DIRECTION", help="Swipe direction: up/down/left/right")
     group.add_argument("--tap", type=int, metavar="REFID", help="Tap element by refId")
     group.add_argument("--input", nargs=2, metavar=("REFID", "TEXT"), help="Input text to element by refId")
+    group.add_argument("--template", metavar="TEMPLATE_JSON", help="Execute a template JSON file via /execute")
     group.add_argument("--launch", "-a", type=str, metavar="PACKAGE", help="Launch app")
     group.add_argument("--health", action="store_true", help="Check service health from /health")
     group.add_argument("--back", action="store_true", help="Press back button")
-    group.add_argument("--apps", action="store_true", help="List launcher apps from /api/apps")
+    group.add_argument("--apps", action="store_true", help="List launcher apps from /apps")
     group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / menu / enter / delete / power")
     group.add_argument("--get-attr", nargs=2, metavar=("REFID", "ATTR"), help="Get element attribute by refId (text/className/bounds/...)")
     group.add_argument("--refId", "-r", type=int, metavar="N", help="Get element details")
@@ -88,11 +114,32 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _load_template_payload(path_str: str) -> Dict[str, Any]:
+    template_path = os.path.expanduser(path_str)
+    try:
+        with open(template_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        print(f"Template file not found: {template_path}", file=sys.stderr)
+        raise SystemExit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Template JSON is invalid: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -> None:
+    if args.template:
+        payload = _load_template_payload(args.template)
+        response = client.execute_template_payload(payload)
+        if response is None:
+            print("Failed to execute template payload. Check the connection hints above.", file=sys.stderr)
+            raise SystemExit(1)
+        print(json.dumps(response, indent=2, ensure_ascii=False))
+        raise SystemExit(0 if response.get("success") is True else 1)
     if args.health:
         health = client.get_health()
         if health is None:
-            print("Failed to fetch health", file=sys.stderr)
+            print("Failed to fetch health. Check the connection hints above.", file=sys.stderr)
             raise SystemExit(1)
         print(json.dumps(health, indent=2, ensure_ascii=False))
         raise SystemExit(0)
@@ -105,7 +152,7 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
     if args.apps:
         apps = client.list_launcher_apps()
         if apps is None:
-            print("Failed to fetch launcher apps", file=sys.stderr)
+            print("Failed to fetch launcher apps. Check the connection hints above.", file=sys.stderr)
             raise SystemExit(1)
         if not apps:
             print("No launcher apps returned.")
@@ -232,21 +279,22 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     url = require_base_url(args.url)
+    token = resolve_api_token(args.token)
 
     if args.repl:
         history_path = os.path.expanduser("~/.agent-android-history")
-        session = AriaReplSession(url=url, history_file=history_path)
+        session = AriaReplSession(url=url, token=token, history_file=history_path)
         session.run()
         return 0
 
-    client = AgentAndroidClient(url)
+    client = AgentAndroidClient(url, token=token)
     _run_direct_commands(args, client)
     _run_wait_command(args, client)
 
     print("Fetching ARIA tree...", file=sys.stderr)
     elements = client.get_ui_elements(wait=args.wait, force_refresh=args.no_cache)
     if not elements:
-        print("Failed to get ARIA tree", file=sys.stderr)
+        print("Failed to get ARIA tree. Check the connection hints above.", file=sys.stderr)
         return 1
 
     if args.output:

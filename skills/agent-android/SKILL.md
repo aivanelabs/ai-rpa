@@ -5,133 +5,224 @@ description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher
 
 # Android REPL
 
-## Overview
+Use this skill to drive an Android device through the public `agent-android` beta surface published in the `aivanelabs/ai-rpa` repo.
 
-Use this skill to drive an Android device through the public agent-android beta surface published in the `aivanelabs/ai-rpa` GitHub repo.
+The public path is local-first:
 
-This skill assumes:
+- the phone hosts the lightweight HTTP service locally
+- the desktop connects directly to `http://<device-ip>:8080`
+- UI reads, taps, inputs, and screenshots stay on the phone and controlling machine
+- the current tradeoff is LAN-only control; an optional server-side or relay path may arrive later
 
-- the phone and the controlling machine are on the same LAN
-- the Android REPL app is installed and its local API service is running
-- the public Python client at `../../clients/python/agent-android.py` is available
+If a Python command suddenly stops working, first check whether the AIVane app or its local API service has exited on the phone.
+
+## Core Workflow
+
+Every Android control task should follow the same short loop:
+
+1. Confirm connectivity with `/health`
+2. Discover the target app with `apps` if needed
+3. Launch one app
+4. Inspect the current UI tree
+5. Perform one action
+6. Inspect again
+
+Keep the loop short. Prefer inspect -> act -> inspect over long speculative command chains.
 
 ## Quick Start
 
-Use the public client directly:
+Start the REPL:
 
 ```bash
 python ../../clients/python/agent-android.py --repl --url http://<device-ip>:8080
 ```
 
-If the user already saved the device URL before, the client can be used without `--url`.
-
-To persist the current device address inside the REPL:
+Save the current device URL inside the REPL:
 
 ```text
 set url http://<device-ip>:8080
 ```
 
-## Core Workflow
-
-### 1. Confirm connectivity
-
-Check that the Android REPL service is alive:
+Built-in help:
 
 ```bash
-curl http://<device-ip>:8080/health
+python ../../clients/python/agent-android.py --help
 ```
 
-If health fails, stop and fix connectivity before trying UI actions.
+```text
+h
+```
 
-### 2. Discover launchable apps
+## Essential CLI Commands
 
-List launcher apps:
+Use the one-off CLI when you already know the exact action you want.
 
 ```bash
+# Connectivity
+python ../../clients/python/agent-android.py --health --url http://<device-ip>:8080
+
+# Discovery
 python ../../clients/python/agent-android.py --apps --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --list --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --id com.example:id/search --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --text Search --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --inputs --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --refId 7 --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --xpath 7 --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --get-attr 7 text --url http://<device-ip>:8080
+
+# Actions
+python ../../clients/python/agent-android.py --launch com.xingin.xhs --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --tap 7 --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --input 7 "hello world" --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --swipe up --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --back --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --press home --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --screenshot --url http://<device-ip>:8080
+
+# Waiting and output
+python ../../clients/python/agent-android.py --wait-for Search --timeout 30 --url http://<device-ip>:8080
+python ../../clients/python/agent-android.py --list --raw --output tree.json --url http://<device-ip>:8080
 ```
 
-Inside the REPL, use:
+## REPL Command Reference
+
+Use the REPL for exploratory tasks and smoke runs. Short aliases and long names both work.
+
+### Browse
+
+- `health` or `hl`
+  Check `/health`.
+- `l [n]` or `list [n]`
+  List the first `n` elements, or all cached elements when `n` is omitted.
+- `ss` or `snapshot`
+  Force-refresh the UI tree and print it again.
+- `f <text>` or `find <text>`
+  Filter by text or content description.
+- `id <resourceId>`
+  Filter by Android resource ID.
+- `ref <refId>`
+  Show the full element detail for one refId.
+- `x <refId>` or `xpath <refId>`
+  Generate XPath candidates and validate their runtime match counts.
+- `xx <refId>`
+  Tap by the best unique generated XPath candidate. Refuses ambiguous matches.
+- `vx <xpath> [idx]` or `validatex <xpath> [idx]`
+  Validate one XPath against the runtime. Optionally inspect one match by zero-based index.
+
+### Interact
+
+- `t <refId>` or `tap <refId>`
+  Tap the element center point from the current tree.
+- `tx <xpath>` or `tapx <xpath>`
+  Tap one runtime-resolved XPath target.
+- `i <refId> <text>` or `input <refId> <text>`
+  Input text into a refId target.
+  Use `--clear` or `""` to clear instead of typing.
+- `ix <xpath> <text>` or `inputx <xpath> <text>`
+  Input text into one XPath target.
+  Use `ix <xpath> --` or `--clear` to clear the field.
+- `sw <d|u|l|r> [--dur N] [--dist N]` or `swipe ...`
+  Swipe down/up/left/right with optional duration and distance.
+- `p <back|home|menu|enter|delete|power>` or `press ...`
+  Press a system key.
+- `b` or `back`
+  Press Back.
+- `la <package>` or `launch <package>`
+  Launch an app by package name.
+- `s [path]` or `screenshot [path]`
+  Capture a screenshot to an auto-generated or explicit path.
+
+### Wait And Inspect
+
+- `wf <text> [--t N]` or `waitfor ...`
+  Wait for an element to appear.
+- `g <refId> <attr>` or `get <refId> <attr>`
+  Read an attribute such as `text`, `class`, `bounds`, `x`, `y`, or `xpath`.
+- `apps`
+  List launcher apps from `/apps`.
+
+### Session
+
+- `raw`
+  Toggle raw JSON mode.
+- `vars`
+  Show current URL, timeout, raw mode, and tree cache state.
+- `set url http://<device-ip>:8080`
+  Switch the server URL and persist it to local config.
+- `set timeout 30`
+  Set the default wait timeout in seconds.
+- `h` or `help`
+  Show the built-in help text.
+- `q` or `quit`
+  Exit the REPL.
+
+## Common Patterns
+
+### First smoke flow
+
+1. `set url http://<device-ip>:8080`
+2. `health`
+3. `apps`
+4. `la <package>`
+5. `l`
+6. `t <refId>`
+7. `i <refId> hello`
+8. `b`
+9. `s`
+
+### Find the right package before launch
 
 ```text
 apps
+la com.example.app
+l
 ```
 
-Use launcher discovery when the user does not know the package name.
+### Inspect an element before using XPath
 
-### 3. Launch and inspect
-
-Launch an app:
-
-```bash
-python ../../clients/python/agent-android.py --launch <package> --url http://<device-ip>:8080
+```text
+l
+ref 12
+x 12
+vx //EditText[@text='Search']
 ```
 
-Then inspect the current UI:
+### Clear and refill an input
 
-```bash
-python ../../clients/python/agent-android.py --list --url http://<device-ip>:8080
+```text
+i 7 --clear
+i 7 hello world
 ```
 
-### 4. Interact step by step
+```text
+ix //EditText[@text='Search'] --
+ix //EditText[@text='Search'] -- hello world
+```
 
-Use the smallest possible action loop:
+## Troubleshooting
 
-1. list current elements
-2. choose one action
-3. perform one action
-4. inspect again
-
-Typical actions:
-
-- tap
-- input
-- swipe
-- back
-- press home
-- screenshot
-
-Prefer short feedback loops over long speculative chains.
-
-### 5. Use templates only when needed
-
-The public story is REPL-first. Keep advanced multi-step template execution as a compatibility path for stronger workflows, not the default first choice.
-
-Use advanced flows only when:
-
-- the user already has a prepared template
-- the task is clearly repetitive
-- a deterministic multi-step path is more valuable than stepwise exploration
-
-## Smoke Flow
-
-For a minimal end-to-end verification, follow this path:
-
-1. `set url http://<device-ip>:8080`
-2. health check
-3. `apps`
-4. `la <package>`
-5. `list`
-6. `tap <refId>`
-7. `input <refId> <text>`
-8. `back`
-
-See [references/smoke-flow.md](references/smoke-flow.md) for a concise checklist.
+- If a Python call fails, first check whether the AIVane app or phone-side API service has exited.
+- Re-open the app or restart the phone-side service, then retry `curl http://<device-ip>:8080/health`.
+- If `health` works but UI commands fail, run `ss` to force-refresh the tree before tapping or inputting.
+- If `tx` or `ix` fails, run `vx <xpath>` and make sure the XPath resolves to exactly one runtime match.
+- If screenshots fail the first time, confirm the on-device MediaProjection permission prompt was accepted.
+- If everything suddenly stops responding, confirm the phone IP did not change and that the desktop is still on the same LAN.
 
 ## When To Stop
 
 Stop and ask for user help when:
 
 - the device is unreachable on LAN
-- the Android REPL app is not running
+- the app is not running and cannot be restarted from the current path
 - required Android permissions are missing
 - launcher discovery returns nothing useful
-- UI state no longer matches the expected screen after repeated retries
+- the runtime UI no longer matches the expected screen after repeated refreshes
 
 ## References
 
-- For the smoke checklist: [references/smoke-flow.md](references/smoke-flow.md)
-- For public protocol expectations: [../../docs/protocol-v1.md](../../docs/protocol-v1.md)
-- For first-run instructions: [../../docs/quickstart.md](../../docs/quickstart.md)
-
-
+- Smoke checklist: [references/smoke-flow.md](references/smoke-flow.md)
+- Quickstart: [../../docs/quickstart.md](../../docs/quickstart.md)
+- Install guide: [../../docs/install-agent-android.md](../../docs/install-agent-android.md)
+- Public protocol: [../../docs/protocol-v1.md](../../docs/protocol-v1.md)
+- Known beta limits: [../../docs/known-limitations.md](../../docs/known-limitations.md)

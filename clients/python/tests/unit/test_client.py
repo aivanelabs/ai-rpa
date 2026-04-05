@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import urllib.error
 
 import pytest
 
@@ -67,6 +68,66 @@ def test_get_health_returns_payload_dict(client, monkeypatch):
     monkeypatch.setattr(client, "_get_raw", lambda _path: payload)
 
     assert client.get_health() == payload
+
+
+def test_get_health_connection_error_prints_actionable_hint(client, capsys):
+    class _BrokenOpener:
+        def open(self, *_args, **_kwargs):
+            raise urllib.error.URLError("connection refused")
+
+    client._opener = _BrokenOpener()
+
+    assert client.get_health() is None
+
+    captured = capsys.readouterr()
+    assert "GET http://device:8080/health failed: connection refused" in captured.err
+    assert "Confirm the AIVane app is still open on the phone" in captured.err
+    assert "curl http://device:8080/health" in captured.err
+
+
+def test_api_call_connection_error_prints_actionable_hint(client, capsys):
+    class _BrokenOpener:
+        def open(self, *_args, **_kwargs):
+            raise urllib.error.URLError("connection refused")
+
+    client._opener = _BrokenOpener()
+
+    assert client._api_call({"templateId": "smoke", "operations": []}) is None
+
+    captured = capsys.readouterr()
+    assert "POST http://device:8080/execute failed: connection refused" in captured.err
+    assert "Confirm the AIVane app is still open on the phone" in captured.err
+    assert "same LAN" in captured.err
+
+
+def test_api_call_sends_token_header(monkeypatch):
+    captured = {}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"success": true}'
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **_kwargs):
+            headers = {key.lower(): value for key, value in request.header_items()}
+            captured["token"] = headers.get("x-api-token")
+            captured["url"] = request.full_url
+            return _FakeResponse()
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
+
+    assert token_client._api_call({"templateId": "smoke", "operations": []}) == {"success": True}
+    assert captured == {
+        "token": "shared-secret",
+        "url": "http://device:8080/execute",
+    }
 
 
 def test_get_ui_elements_caches_results_and_saves_snapshot(client, monkeypatch):

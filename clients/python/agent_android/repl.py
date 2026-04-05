@@ -8,7 +8,7 @@ import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 from .client import AgentAndroidClient
-from .config import CONFIG_FILE_PATH, save_url_to_config
+from .config import CONFIG_FILE_PATH, save_token_to_config, save_url_to_config
 from .formatting import _format_launcher_app, format_element, print_tree
 
 try:
@@ -81,8 +81,8 @@ class AriaReplSession:
         ('q', 'quit',          'Quit'),
     ]
 
-    def __init__(self, url: str, history_file: str = None):
-        self.client = AgentAndroidClient(url)
+    def __init__(self, url: str, token: str = None, history_file: str = None):
+        self.client = AgentAndroidClient(url, token=token)
         self._tree: Optional[List[Dict]] = None   # Currently cached tree
         self._raw_output: bool = False            # Raw JSON output toggle
         self._timeout: int = 30                  # Default wait timeout in seconds
@@ -361,7 +361,10 @@ class AriaReplSession:
             limit = int(args[0])
         tree = self._ensure_tree()
         if not tree:
-            self._print_error(f"Failed to get ARIA tree (package={self._current_package_label()})")
+            self._print_error(
+                f"Failed to get ARIA tree (package={self._current_package_label()}). "
+                "Check the connection hints above."
+            )
             return False
         elems = tree[:limit] if limit else tree
         self._print_tree(elems)
@@ -371,7 +374,10 @@ class AriaReplSession:
         """ss - force-refresh the tree and print it."""
         tree = self._ensure_tree(force=True)
         if not tree:
-            self._print_error(f"Failed to get ARIA tree (package={self._current_package_label()})")
+            self._print_error(
+                f"Failed to get ARIA tree (package={self._current_package_label()}). "
+                "Check the connection hints above."
+            )
             return False
         self._print_tree(tree, f"ARIA Tree (refreshed) - {len(tree)} elements")
         return True
@@ -386,7 +392,7 @@ class AriaReplSession:
         """health - fetch and print the /health payload."""
         health = self.client.get_health()
         if health is None:
-            self._print_error("Failed to fetch health.")
+            self._print_error("Failed to fetch health. Check the connection hints above.")
             return False
         if self._raw_output:
             print(json.dumps(health, indent=2, ensure_ascii=False))
@@ -821,7 +827,7 @@ class AriaReplSession:
         """apps - list launcher apps."""
         apps = self.client.list_launcher_apps()
         if apps is None:
-            self._print_error("Failed to fetch launcher apps.")
+            self._print_error("Failed to fetch launcher apps. Check the connection hints above.")
             return False
         if not apps:
             print("  No launcher apps returned.")
@@ -844,6 +850,7 @@ class AriaReplSession:
         """vars - show session variables."""
         print("  Session:")
         print(f"    URL:      {self.client.base_url}")
+        print(f"    Token:    {'SET' if self.client.token else 'NOT SET'}")
         print(f"    Timeout:  {self._timeout}s")
         print(f"    RawJSON:  {'ON' if self._raw_output else 'OFF'}")
         print(f"    Cached:   {'YES' if self._tree is not None else 'NO'}")
@@ -852,9 +859,9 @@ class AriaReplSession:
         return True
 
     def _cmd_set(self, args: List[str]) -> bool:
-        """set <url|timeout> <value> - set a session variable."""
+        """set <url|token|timeout> <value> - set a session variable."""
         if len(args) < 2:
-            self._print_error("Usage: set <url|timeout> <value>")
+            self._print_error("Usage: set <url|token|timeout> <value>")
             return False
         key, value = args[0], ' '.join(args[1:])
         if key == 'url':
@@ -862,18 +869,32 @@ class AriaReplSession:
             if not trimmed_value:
                 self._print_error("URL cannot be empty")
                 return False
-            self.client = AgentAndroidClient(trimmed_value)
+            self.client = AgentAndroidClient(trimmed_value, token=self.client.token)
             print(f"  URL set to: {trimmed_value}")
             try:
                 save_url_to_config(trimmed_value)
                 print(f"  Persisted to {CONFIG_FILE_PATH}")
             except OSError as exc:
                 print(f"  Warning: could not save URL to {CONFIG_FILE_PATH}: {exc}", file=sys.stderr)
+        elif key == 'token':
+            decoded = self._decode_input_payload(value.strip())
+            normalized = decoded.strip()
+            token = normalized or None
+            self.client = AgentAndroidClient(self.client.base_url, token=token)
+            if token:
+                print("  Token set for protected API access")
+            else:
+                print("  Token cleared")
+            try:
+                save_token_to_config(token)
+                print(f"  Persisted to {CONFIG_FILE_PATH}")
+            except OSError as exc:
+                print(f"  Warning: could not save token to {CONFIG_FILE_PATH}: {exc}", file=sys.stderr)
         elif key == 'timeout':
             self._timeout = int(value)
             print(f"  Timeout set to: {self._timeout}s")
         else:
-            self._print_error(f"Unknown variable: {key!r}.  Available: url, timeout")
+            self._print_error(f"Unknown variable: {key!r}.  Available: url, token, timeout")
             return False
         return True
 
@@ -903,6 +924,9 @@ class AriaReplSession:
             "",
             "  agent-android REPL v5.4 - Command Reference",
             "  " + "-" * 67,
+            "  Local-first beta path: the phone hosts the HTTP service and the desktop",
+            "  connects directly over LAN. If calls fail, first check whether the",
+            "  AIVane app or phone-side API service has exited.",
             "",
             "  Browse",
             "    health            Check the /health endpoint",
@@ -945,6 +969,7 @@ class AriaReplSession:
             "    vars               Show session variables",
             "    apps               List launcher apps",
             "    set url <url>      Switch the server URL",
+            "    set token <value>  Save the shared token (--clear to remove it)",
             "    set timeout <N>    Set the default wait timeout (seconds)",
             "",
             "  Exit",
@@ -955,6 +980,13 @@ class AriaReplSession:
             "              i->input, ix->inputx, sw->swipe, p->press, b->back,",
             "              wf->waitfor, g->get, s->screenshot, la->launch, hl->health, vx->validatex,",
             "              ref->ref, x->xpath, f->find, h->help, q->quit",
+            "",
+            "  Troubleshooting",
+            "    1. health",
+            "    2. apps",
+            "    3. ss",
+            "    If health fails, verify the phone app is still running, the URL/IP is current,",
+            "    and the desktop is still on the same LAN.",
             "",
         ]
         print('\n'.join(lines))

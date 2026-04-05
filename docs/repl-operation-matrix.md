@@ -5,7 +5,7 @@
 | 操作 | 命令 / 说明 | 结果 | 备注 |
 |------|-------------|------|------|
 | health | `curl http://192.168.3.207:8080/health` | ✅ 成功返回 `{"service":"aivane-repl","status":"running",...}` | HTTP 服务可访问 |
-| apps | `curl http://192.168.3.207:8080/api/apps` + `python ... agent-android.py --apps` | ✅ 列出 50+ 个 launcher 应用 | `apps` 命令返回与 curl 相同的列表 |
+| apps | `curl http://192.168.3.207:8080/apps` + `python ... agent-android.py --apps` | ✅ 列出 50+ 个 launcher 应用 | `apps` 命令返回与 curl 相同的列表 |
 | launch | `python agent-android.py --launch aivane.apprepl` | ✅ 返回 `Launched: aivane.apprepl` | 也已对其它 launcher app 做过启动验证 |
 | list | `python agent-android.py --wait 2 --list` | ✅ 能列出桌面和 `AIVane REPL` 页面 ARIA 树 | 界面刷新后可重复调用 |
 | tap | `python agent-android.py --tap <refId>` | ✅ 已在真机上成功点按按钮/图标 | 示例：成功点按 `复制 BASE URL` 等元素 |
@@ -14,9 +14,9 @@
 | back | `python agent-android.py --back` | ✅ `Pressed back` | Android back 操作执行成功 |
 | press home | `python agent-android.py --press home` | ✅ `Pressed: home` | 启动器已回到主屏 |
 | screenshot | `python agent-android.py --screenshot` | ✅ 已成功保存截图文件 | 首次需在设备上完成 MediaProjection 授权 |
-| stop | `curl -X POST http://192.168.3.207:8080/api/stop` | ✅ 返回 `{\"success\":true,\"message\":\"Stop signal dispatched\"}` | 远程 stop 端点已可用 |
+| stop | `curl -X POST http://192.168.3.207:8080/stop` | ✅ 返回 `{\"success\":true,\"message\":\"Stop signal dispatched\"}` | 远程 stop 端点已可用 |
 | 地址显示 | REPL `vars` / README 说明 | ✅ REPL 会打 “Server: http://...” | URL 已经支持 persisted config，并在 README 中说明 |
-| start-app-repl.sh | `bash start-app-repl.sh` | ✅ 已在主机侧验证 | 可自动拉起 app、配置无障碍、启动服务并检查 `/health` 与 `/api/apps` |
+| start-app-repl.sh | `bash start-app-repl.sh` | ✅ 已在主机侧验证 | 可自动拉起 app、配置无障碍、启动服务并检查 `/health` 与 `/apps` |
 
 ## 结论
 

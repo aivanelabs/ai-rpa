@@ -5,10 +5,10 @@ This document outlines the public-facing protocol surface for the first AIVane A
 ## Core Endpoints
 
 - `GET /health`
-  - Basic service and status diagnostics
-- `GET /api/apps`
+  - Basic service diagnostics and permission readiness (`permissions.accessibilityEnabled`, `permissions.overlayPermissionGranted`, `permissions.screenshotPermissionGranted`)
+- `GET /apps`
   - List launchable apps
-- `POST /api/stop`
+- `POST /stop`
   - Request stop for the current task
 - `GET /screenshot`
   - Capture a screenshot
@@ -17,7 +17,7 @@ This document outlines the public-facing protocol surface for the first AIVane A
 
 ## Advanced / Compatibility Endpoint
 
-- `POST /api/execute`
+- `POST /execute`
   - Compatibility and advanced path
   - Allows multi-step template execution
   - Kept for powerful workflows, but not the main public story
@@ -38,6 +38,7 @@ Compatibility story:
 
 - LAN usage only
 - Optional shared token
+- Client transport can send the token through the `x-api-token` header
 - Visible service state and stop controls
 
 This protocol will continue to be refined as the public beta evolves.
