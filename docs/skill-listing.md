@@ -23,6 +23,7 @@ Use AIVane to connect to an Android device, list launcher apps, inspect the curr
 
 - Beta / experimental
 - LAN-only workflow
+- Local-first device control with the phone hosting the public HTTP endpoint
 - REPL-first experience
 - Advanced template execution remains available as a compatibility path
 
@@ -30,6 +31,7 @@ Use AIVane to connect to an Android device, list launcher apps, inspect the curr
 
 - Accessibility must be enabled manually
 - Screenshot requires explicit authorization on device
+- Python connectivity depends on the phone-side app/service still running
 - The current release is aimed at exploration and testing, not fully unattended production use
 
 ## Call To Action

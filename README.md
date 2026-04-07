@@ -6,6 +6,13 @@ This repository is the public-facing launch repo for `aivanelabs/ai-rpa` on GitH
 
 The first public surface is **AIVane Android REPL Beta**: a lightweight Python CLI, public docs, examples, and sample skills that let AI agents inspect Android UI state and control a phone step by step over LAN.
 
+## Why The Phone Is The Web Server
+
+- In this beta, the phone runs the lightweight HTTP service locally and the desktop connects straight to `http://<device-ip>:8080`.
+- All operations stay local: UI inspection, taps, text input, and screenshots are executed without uploading user data.
+- You can complete the first smoke flow without any cloud dependency, which keeps early evaluation simple on a trusted LAN.
+- This local-first design also explains the current LAN-only limitation. An optional server-side or relay path is being considered for a later step so control is not limited to the local network, while the direct local path remains available.
+
 ## Current Status
 
 - The repo structure and public CLI are ready for evaluation.
@@ -41,6 +48,7 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 
 - Use the beta only on a trusted LAN.
 - Do not expose the device port to the public internet.
+- The public beta path does not require a cloud relay; device traffic stays between the controller and the phone.
 - Accessibility and screenshot capabilities require explicit user approval on the phone.
 
 ## Quick Start
