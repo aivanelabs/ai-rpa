@@ -36,13 +36,6 @@
 - `skills/` 下的 sample agent skills
 - [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) 中的 beta APK
 
-## 本仓未公开的内容
-
-- Java 核心流程引擎内部实现
-- 超出公开面的 Android runtime 内部实现
-- 内部部署与发布流水线
-- 私有更新渠道、凭据和商业化打包部分
-
 ## 安全提示
 
 - 当前 beta 只建议在可信局域网中使用。

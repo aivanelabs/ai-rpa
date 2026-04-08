@@ -37,13 +37,6 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 - Smoke examples and launch helpers
 - Sample agent skills under `skills/`
 
-## What Is Not Open In This Repo
-
-- Core Java workflow engine internals
-- Android runtime internals beyond the public surface
-- Internal deployment and release infrastructure
-- Private update channels, credentials, and commercial packaging
-
 ## Security Note
 
 - Use the beta only on a trusted LAN.
@@ -54,12 +47,21 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
 ## Quick Start
 
 1. Install the AIVane Android REPL beta APK on your phone.
-2. Make sure the phone and computer are on the same Wi-Fi network.
-3. Run the CLI:
+2. Enable the required on-device permissions:
+   - turn on the AIVane accessibility service
+   - accept the screenshot permission prompt the first time you use `screenshot`
+3. Make sure the phone and computer are on the same Wi-Fi network.
+4. Confirm the phone-side service is reachable:
+   - find the phone's local IP address on the same Wi-Fi network
+   - run `curl http://<device-ip>:8080/health`
+   - expect a JSON response instead of a connection error
+   - some builds return only basic service status here, while others also include a `permissions` object
+   - if your `/health` response includes `permissions.accessibilityEnabled` and it is `false`, open Android Settings and enable the AIVane accessibility service manually before expecting `launch`, `list`, `tap`, or `input` to work
+5. Run the CLI:
    ```bash
    python clients/python/agent-android.py --repl --url http://<device-ip>:8080
    ```
-4. Inside the REPL, save the URL (`set url http://<device-ip>:8080`) and run the first smoke path:
+6. Inside the REPL, save the URL (`set url http://<device-ip>:8080`) and run the first smoke path:
    - `health`
    - `apps`
    - `la <package>`
@@ -69,6 +71,63 @@ The first public surface is **AIVane Android REPL Beta**: a lightweight Python C
    - `back`
    - `press home`
    - `screenshot`
+
+If you want an ADB-assisted setup path, see [docs/install-agent-android.md](docs/install-agent-android.md). That guide includes both shell and Windows PowerShell examples.
+
+## You Are Ready If
+
+Your first-run setup is in good shape if you can do all of the following:
+
+1. `curl http://<device-ip>:8080/health` returns JSON instead of a connection error
+2. `python clients/python/agent-android.py --repl --url http://<device-ip>:8080` opens the REPL banner
+3. `apps` lists launcher apps, or you can launch a known package directly if your build does not expose `/apps`
+4. `la <package>` opens a target app
+5. `list` shows the current UI tree
+6. one inspect -> act -> inspect loop works, such as `list` -> `tap` -> `list`
+
+## Skills
+
+This beta is currently CLI-first.
+
+- The `skills/` directory contains public reference prompts and workflow guidance.
+- There is not yet a one-click public installer for Codex, Claude Code, or OpenClaw skills in this repo.
+- If you use an agent platform with local skill files, copy the relevant text from `skills/agent-android/SKILL.md` into your own skill or prompt setup.
+- If you only want to verify the product quickly, start with the Python CLI first and add a skill wrapper later.
+
+Minimal Codex starter:
+
+```text
+Use the AIVane Android public client at `clients/python/agent-android.py`.
+Verify `--health` first.
+Then follow inspect -> act -> inspect:
+- `--apps` if the package is unknown
+- `--launch <package>`
+- `--list`
+- one action such as `--tap`, `--input`, `--swipe`, `--back`, or `--screenshot`
+- `--list` again
+
+Do not assume refIds remain stable after navigation.
+```
+
+## First Task Example: Xiaohongshu Search
+
+Once `/health` works, a typical Xiaohongshu exploration loop looks like this:
+
+1. `apps`
+2. `la com.xingin.xhs`
+3. `list`
+4. `find Search`
+5. `tap <refId>` for the search field or search entry point
+6. `input <refId> "<keyword>"`
+7. `list`
+8. `swipe up` to inspect more results if needed
+
+Notes:
+
+- If `apps` returns `404 Not Found` on your build, skip it and launch `com.xingin.xhs` directly.
+- `refId` values change across devices and screens, so re-run `list` after each action.
+- If a tap or input fails after navigation, run `snapshot` or `list` again before retrying.
+- For more detail, see [docs/agent-examples.md](docs/agent-examples.md).
 
 ## Public Assets
 

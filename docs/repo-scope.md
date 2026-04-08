@@ -9,14 +9,6 @@ This staging repo captures the upcoming `aivanelabs/ai-rpa` public surface for A
 - Smoke examples
 - Sample skills for agent ecosystems
 
-## Intended Private Content
-
-- Java core workflow engine internals
-- Android runtime internals beyond the public surface
-- Internal deployment scripts
-- Private update channels
-- Secrets, credentials, release infrastructure
-
 ## Contribution Model
 
 - External contributors:
@@ -25,8 +17,8 @@ This staging repo captures the upcoming `aivanelabs/ai-rpa` public surface for A
   - protocol feedback
   - client-side usability improvements
 - Internal team:
-  - private runtime
-  - private engine
+  - runtime work
+  - engine work
   - release packaging
 
 ## Naming

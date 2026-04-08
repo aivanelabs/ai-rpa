@@ -18,7 +18,7 @@ Thank you for helping shape the public `aivanelabs/ai-rpa` experience!
 
 ## Expectations
 
-- Keep private runtime logic out of these public assets.
+- Keep changes aligned with the documented protocol and public-facing assets in this repository.
 - Cite real device or protocol observations when describing smoke flows.
 - Keep changes focused; this repository stays lean while the first public release is prepared.
 

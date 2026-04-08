@@ -9,6 +9,5 @@
 
 ## Scope check
 
-- [ ] No private runtime logic was added
+- [ ] Changes stay aligned with the documented protocol and public-facing assets
 - [ ] Docs/examples/skills stay within the public boundary
-
