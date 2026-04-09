@@ -78,9 +78,10 @@ def test_main_list_raw_writes_output_file(monkeypatch, tmp_path, capsys):
             self.base_url = url
             self.token = token
 
-        def get_ui_elements(self, wait=0, force_refresh=False):
+        def get_ui_elements(self, wait=0, force_refresh=False, visible_only=True):
             assert wait == 0
             assert force_refresh is False
+            assert visible_only is True
             return elements
 
     output_path = tmp_path / "tree.json"
@@ -105,6 +106,29 @@ def test_main_list_raw_writes_output_file(monkeypatch, tmp_path, capsys):
     assert json.loads(captured.out) == elements
     assert json.loads(output_path.read_text(encoding="utf-8")) == elements
     assert "ARIA tree saved to:" in captured.err
+
+
+def test_main_list_include_offscreen_passes_flag(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def get_ui_elements(self, wait=0, force_refresh=False, visible_only=True):
+            assert wait == 0
+            assert force_refresh is False
+            assert visible_only is False
+            return [{"refId": 2, "text": "Offscreen"}]
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-android.py", "--url", "http://device:8080", "--list", "--include-offscreen", "--raw"],
+    )
+
+    assert cli_module.main() == 0
+    assert json.loads(capsys.readouterr().out) == [{"refId": 2, "text": "Offscreen"}]
 
 
 def test_main_wait_for_command_reports_match(monkeypatch, capsys):
