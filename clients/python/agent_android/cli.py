@@ -152,7 +152,11 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
     if args.apps:
         apps = client.list_launcher_apps()
         if apps is None:
-            print("Failed to fetch launcher apps. Check the connection hints above.", file=sys.stderr)
+            print(
+                "Failed to fetch launcher apps. Check the connection hints above "
+                "and confirm the service is healthy.",
+                file=sys.stderr,
+            )
             raise SystemExit(1)
         if not apps:
             print("No launcher apps returned.")

@@ -827,7 +827,10 @@ class AriaReplSession:
         """apps - list launcher apps."""
         apps = self.client.list_launcher_apps()
         if apps is None:
-            self._print_error("Failed to fetch launcher apps. Check the connection hints above.")
+            self._print_error(
+                "Failed to fetch launcher apps. Check the connection hints above "
+                "and confirm the service is healthy."
+            )
             return False
         if not apps:
             print("  No launcher apps returned.")
