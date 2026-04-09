@@ -134,8 +134,9 @@ def test_get_ui_elements_caches_results_and_saves_snapshot(client, monkeypatch):
     elements = [{"refId": 1, "text": "Search"}]
     calls = {"fetch": 0, "save": 0}
 
-    def fake_fetch():
+    def fake_fetch(visible_only=True):
         calls["fetch"] += 1
+        assert visible_only is True
         return elements
 
     def fake_save(base_url, package_name, saved_elements):
@@ -159,6 +160,25 @@ def test_get_ui_elements_caches_results_and_saves_snapshot(client, monkeypatch):
         "packageName": "pkg.example",
         "elements": elements,
     }
+
+
+def test_get_ui_elements_keeps_visible_only_cache_separate(client, monkeypatch):
+    calls = []
+
+    def fake_fetch(visible_only=True):
+        calls.append(visible_only)
+        return [{"refId": 1 if visible_only else 2}]
+
+    monkeypatch.setattr(client, "_fetch_ui_elements_impl", fake_fetch)
+    monkeypatch.setattr(client, "get_current_package_name", lambda: "pkg.example")
+    monkeypatch.setattr(client_module, "save_snapshot", lambda *_args: None)
+
+    visible = client.get_ui_elements(visible_only=True)
+    all_nodes = client.get_ui_elements(visible_only=False)
+
+    assert visible == [{"refId": 1}]
+    assert all_nodes == [{"refId": 2}]
+    assert calls == [True, False]
 
 
 def test_resolve_action_target_rejects_snapshot_from_other_package(client, monkeypatch, capsys):

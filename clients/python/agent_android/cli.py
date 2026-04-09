@@ -85,6 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-cache", action="store_true", help="Force refresh ARIA tree (bypass cache)")
     parser.add_argument("--wait-for", type=str, metavar="TEXT", help="Wait for element with text matching to appear")
     parser.add_argument("--timeout", "-t", type=int, default=30, help="Max wait time for --wait-for (default: 30s)")
+    parser.add_argument("--include-offscreen", action="store_true", help="Include off-screen elements in the returned tree")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--list", "-l", action="store_true", help="List all elements")
@@ -296,7 +297,11 @@ def main() -> int:
     _run_wait_command(args, client)
 
     print("Fetching ARIA tree...", file=sys.stderr)
-    elements = client.get_ui_elements(wait=args.wait, force_refresh=args.no_cache)
+    elements = client.get_ui_elements(
+        wait=args.wait,
+        force_refresh=args.no_cache,
+        visible_only=not args.include_offscreen,
+    )
     if not elements:
         print("Failed to get ARIA tree. Check the connection hints above.", file=sys.stderr)
         return 1

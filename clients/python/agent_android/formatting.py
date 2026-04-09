@@ -62,9 +62,6 @@ def format_element(elem: Dict[str, Any]) -> str:
     if elem.get("focusable"):
         status.append("focusable")
     lines.append("| status: {}".format(", ".join(status) if status else "none"))
-    lines.append("|")
-    lines.append("| XPath:")
-    lines.append("|   {}".format(_terminal_text(elem.get("xpath", "N/A"))))
     lines.append("+" + "-" * 60 + "+")
     return "\n".join(lines)
 

@@ -28,7 +28,9 @@ class AgentAndroidClient:
         self.execute_url = f"{self.base_url}/execute"
         self._opener = _build_http_opener(self.base_url)
         self._local_tree: Optional[List[Dict]] = None  # In-process UI tree cache
+        self._local_tree_visible_only = True
         self._ui_tree_xml_cache: Optional[str] = None
+        self._ui_tree_xml_cache_visible_only = True
         self._package_name_cache: Optional[str] = None
         self._snapshot: Optional[Dict[str, Any]] = None
 
@@ -266,7 +268,9 @@ class AgentAndroidClient:
         if result and result.get('success'):
             print(success_message)
             self._local_tree = None
+            self._local_tree_visible_only = True
             self._ui_tree_xml_cache = None
+            self._ui_tree_xml_cache_visible_only = True
             return True
 
         msg = result.get('errorMessage', 'Unknown error') if result else 'no response'
@@ -412,6 +416,31 @@ class AgentAndroidClient:
             "bounds": outputs.get("boundsValue"),
         }
 
+    def _describe_unique_xpath_match_runtime(self, xpath: str) -> Dict[str, Any]:
+        detail = self._describe_unique_xpath_match(xpath)
+        bounds = detail.get("bounds")
+        parsed = self._parse_bounds_string(bounds) if isinstance(bounds, str) else None
+        x = y = None
+        if parsed:
+            x1, y1, x2, y2 = parsed
+            x = (x1 + x2) // 2
+            y = (y1 + y2) // 2
+
+        class_name = detail.get("className")
+        return {
+            "index": 0,
+            "count": 1,
+            "refId": None,
+            "text": detail.get("text"),
+            "contentDescription": detail.get("contentDescription"),
+            "className": class_name,
+            "bounds": bounds,
+            "x": x,
+            "y": y,
+            "resourceId": None,
+            "isInput": class_name in {"EditText", "AutoCompleteTextView", "TextInputEditText"},
+        }
+
     def validate_xpath_runtime(self, xpath: str) -> Optional[Dict[str, Any]]:
         """Validate an XPath in the Android runtime and return a summary for unique matches."""
         count = self._get_xpath_match_count(xpath)
@@ -430,6 +459,9 @@ class AgentAndroidClient:
         """Describe one XPath match from the current UI tree."""
         if index < 0:
             return None
+        runtime_count = self._get_xpath_match_count(xpath)
+        if runtime_count == 1 and index == 0:
+            return self._describe_unique_xpath_match_runtime(xpath)
         tree = self.get_ui_elements(force_refresh=True)
         if not tree:
             return None
@@ -458,9 +490,13 @@ class AgentAndroidClient:
             return target, detail, "not_input"
         return target, detail, None
 
-    def get_ui_tree_xml(self, force_refresh: bool = False) -> Optional[str]:
-        """Return the full accessibility UI tree XML."""
-        if not force_refresh and self._ui_tree_xml_cache is not None:
+    def get_ui_tree_xml(self, force_refresh: bool = False, visible_only: bool = True) -> Optional[str]:
+        """Return the accessibility UI tree XML."""
+        if (
+            not force_refresh
+            and self._ui_tree_xml_cache is not None
+            and self._ui_tree_xml_cache_visible_only == visible_only
+        ):
             return self._ui_tree_xml_cache
 
         result = self._execute_template(
@@ -472,6 +508,7 @@ class AgentAndroidClient:
                     "parameters": {
                         "filePath": "/storage/emulated/0/Android/data/aivane.apprepl/files/ui_tree_dump.xml",
                         "format": "xml",
+                        "visibleOnly": visible_only,
                         "variableName": "uiTreeContent",
                     },
                 }
@@ -481,13 +518,14 @@ class AgentAndroidClient:
         xml_text = outputs.get("uiTreeContent")
         if isinstance(xml_text, str) and xml_text.strip():
             self._ui_tree_xml_cache = xml_text
+            self._ui_tree_xml_cache_visible_only = visible_only
             return xml_text
         return None
 
     # ---------------------------------------------------------------------------
     # ---------------------------------------------------------------------------
 
-    def get_ui_elements(self, wait: int = 0, force_refresh: bool = False
+    def get_ui_elements(self, wait: int = 0, force_refresh: bool = False, visible_only: bool = True
                         ) -> Optional[List[Dict]]:
         """
         Fetch the current UI element list.
@@ -498,12 +536,17 @@ class AgentAndroidClient:
         if wait > 0:
             time.sleep(wait)
 
-        if not force_refresh and self._local_tree is not None:
+        if (
+            not force_refresh
+            and self._local_tree is not None
+            and self._local_tree_visible_only == visible_only
+        ):
             return self._local_tree
 
-        elements = self._fetch_ui_elements_impl()
+        elements = self._fetch_ui_elements_impl(visible_only=visible_only)
         if elements is not None:
             self._local_tree = elements
+            self._local_tree_visible_only = visible_only
             package_name = self.get_current_package_name()
             try:
                 save_snapshot(self.base_url, package_name, elements)
@@ -516,16 +559,16 @@ class AgentAndroidClient:
                 pass
         return elements
 
-    def _fetch_ui_elements_impl(self) -> Optional[List[Dict]]:
+    def _fetch_ui_elements_impl(self, visible_only: bool = True) -> Optional[List[Dict]]:
         """Fetch the UI element list from the API."""
         json_str = (
             '{"templateId":"ui-elements-get","templateName":"UI Elements Query",'
             '"parameters":[{"name":"uiElements","type":"STRING","direction":"OUTPUT"}],'
             '"operations":['
-            '{"operationType":"android.ui.getAriaTree","parameters":{"variableName":"tree"}},'
+            '{"operationType":"android.ui.getAriaTree","parameters":{"variableName":"tree","visibleOnly":%s}},'
             '{"operationType":"variable.assign","parameters":{"variableName":"uiElements","value":"\\u0024{tree}"}}'
             ']}'
-        )
+        ) % ("true" if visible_only else "false")
         result = self._api_call(json.loads(json_str))
         if not result:
             return None
@@ -839,6 +882,9 @@ class AgentAndroidClient:
         if result and result.get('success'):
             print(f"Pressed: {key}")
             self._local_tree = None
+            self._local_tree_visible_only = True
+            self._ui_tree_xml_cache = None
+            self._ui_tree_xml_cache_visible_only = True
             return True
 
         msg = result.get('errorMessage', 'Unknown') if result else 'no response'

@@ -163,7 +163,9 @@ class AriaReplSession:
                 return cmd, []
             if extra and extra.isdigit():
                 return cmd, [xpath, extra]
-            return cmd, [remainder] if remainder else []
+            if extra.startswith('(') and extra.endswith(')'):
+                return cmd, [xpath]
+            return cmd, [xpath] if xpath else []
 
         if cmd in ('ix', 'inputx'):
             return cmd, self._parse_xpath_input_args(remainder)
