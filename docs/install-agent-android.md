@@ -37,6 +37,32 @@ If you already have an APK file locally, you can pass it as the second argument:
 
 The helper enables accessibility, starts the app, and tries to bring up the API service before checking `/health`.
 
+Important:
+
+- On some Android builds, ADB cannot enable accessibility automatically because changing secure settings requires `android.permission.WRITE_SECURE_SETTINGS`.
+- If the helper prints a permission denial or `/health` shows `"accessibilityEnabled": false`, open Android Settings and enable the AIVane accessibility service manually.
+- Until accessibility is enabled, `/health` and `apps` may work, but `launch`, `list`, `tap`, `input`, and other UI-inspection commands can still fail.
+
+On Windows PowerShell, you can use the matching helper:
+
+```powershell
+.\examples\start-app-repl.ps1 192.168.3.207
+```
+
+If you already have an APK file locally:
+
+```powershell
+.\examples\start-app-repl.ps1 192.168.3.207 .\aivane.apk
+```
+
+If you are not using ADB, do this manually on the phone before moving on:
+
+1. Open the AIVane app.
+2. Enable the AIVane accessibility service.
+3. Keep the app open long enough for the local service to come up.
+4. Find the phone's Wi-Fi IP address.
+5. Confirm `curl http://<device-ip>:8080/health` returns JSON.
+
 ## 4. Run the first smoke
 
 1. Open the REPL client:  
@@ -45,6 +71,14 @@ The helper enables accessibility, starts the app, and tries to bring up the API 
 3. If you granted screenshot permission, run `screenshot` to confirm capture.
 
 This smoke ensures the base APIs and CLI actions function before automating larger flows.
+
+## 5. Wrap the flow in a skill
+
+This repository ships public skill references under [`skills/`](../skills/), especially [`skills/agent-android/SKILL.md`](../skills/agent-android/SKILL.md).
+
+- Today the public beta is still CLI-first.
+- There is no one-click installer in this repo for Codex, Claude Code, or OpenClaw.
+- Use the skill files as copyable reference prompts/workflows for your agent environment after you have already confirmed the CLI smoke flow works.
 
 ## If Python calls stop working
 

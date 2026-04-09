@@ -7,6 +7,7 @@ This quickstart introduces the public GitHub beta for AIVane (AI Mobile Automati
 - An Android device with the AIVane REPL beta APK installed
 - A desktop or laptop on the same LAN
 - Python 3.7+
+- `curl` or a browser to test `http://<device-ip>:8080/health`
 
 ## Why The Phone Hosts The Service
 
@@ -16,6 +17,38 @@ This quickstart introduces the public GitHub beta for AIVane (AI Mobile Automati
 - The tradeoff is that the first public build is LAN-only. A later optional server-side or relay path is under consideration for scenarios that need control beyond the local network.
 
 ## First Run
+
+Before you open the desktop CLI, make sure the phone is actually ready:
+
+1. Open the AIVane app on the phone.
+2. Enable the AIVane accessibility service if Android prompts for it.
+3. Keep the phone and desktop on the same Wi-Fi network.
+4. Find the phone's local IP address on that Wi-Fi network.
+5. Check `http://<device-ip>:8080/health`.
+
+If `/health` works but shows `"accessibilityEnabled": false`, stop there and enable the AIVane accessibility service manually in Android Settings before trying `launch`, `list`, `tap`, or `input`.
+
+If `/health` does not respond yet, go to [install-agent-android.md](install-agent-android.md) for the ADB-assisted startup path and troubleshooting steps.
+
+## First 10 Minutes
+
+Use these checkpoints to avoid guessing:
+
+1. `curl http://<device-ip>:8080/health`
+   Success should be JSON, not a timeout or connection-refused error. The payload should include basic service status and a `permissions` object.
+2. `python clients/python/agent-android.py --health --url http://<device-ip>:8080`
+   Success should print formatted JSON from the same `/health` endpoint.
+3. `python clients/python/agent-android.py --repl --url http://<device-ip>:8080`
+   Success should open the interactive REPL and print a banner like:
+
+```text
+agent-android REPL v5.4  -  Android UI Automation REPL
+Server: http://<device-ip>:8080
+Type 'h' for help, 'q' to quit.
+```
+
+4. Inside the REPL, run `health`, then `apps`.
+   If `health` fails here, do not keep guessing at UI commands. Fix connectivity first.
 
 Run the CLI with an explicit URL:
 
@@ -67,7 +100,85 @@ python clients/python/agent-android.py --back --url http://<device-ip>:8080
 
 - `/execute` remains available for advanced multi-step templates.
 - The public protocol may be narrowed and cleaned up before release.
-- Public sample skills are not staged yet.
+- Public sample skills are available under [`skills/`](../skills/), but this repo does not yet provide a one-click installer for Codex, Claude Code, or OpenClaw. Treat them as reference prompts/workflows unless your agent platform already supports local skill files.
+
+## Skills Versus CLI
+
+If you are trying the beta for the first time, start with the CLI first:
+
+1. Verify `/health`
+2. Run `python clients/python/agent-android.py --help`
+3. Run one smoke flow in the REPL
+4. Only then wrap that flow in your own agent skill/prompt
+
+This avoids mixing two separate onboarding problems: device connectivity and agent-specific skill installation.
+
+## Codex Skill Setup Example
+
+If you want to wrap the public CLI in a Codex skill after the smoke flow works, create a local skill/prompt that says:
+
+```text
+Use the AIVane Android public client at `clients/python/agent-android.py`.
+
+Default loop:
+1. Verify `--health --url http://<device-ip>:8080`
+2. Use `--apps` if the package is unknown
+3. Launch one app
+4. Inspect with `--list`
+5. Perform one action
+6. Inspect again
+
+For Xiaohongshu:
+- launch `com.xingin.xhs`
+- inspect the current UI
+- find the search entry point
+- tap it
+- input the requested keyword
+- inspect the results screen
+
+Do not assume refIds stay stable after navigation. Re-run `--list` after each action.
+```
+
+The checked-in [`skills/agent-android/SKILL.md`](../skills/agent-android/SKILL.md) is the fuller reference version of the same idea.
+
+## Task Example: Search Xiaohongshu
+
+After `/health` works, this is a good first exploratory loop:
+
+```text
+apps
+la com.xingin.xhs
+list
+find Search
+tap <refId>
+input <refId> lipstick
+list
+swipe up
+list
+```
+
+`refId` values vary by device, language, and app version, so re-run `list` after each action instead of assuming fixed IDs.
+
+## Windows Verification Chain
+
+If you prefer a non-interactive first pass on Windows, run this checkpoint chain:
+
+```powershell
+.\examples\start-app-repl.ps1 192.168.3.207 .\aivane.apk
+python .\clients\python\agent-android.py --health --url http://192.168.3.207:8080
+python .\clients\python\agent-android.py --launch com.xingin.xhs --url http://192.168.3.207:8080
+python .\clients\python\agent-android.py --list --url http://192.168.3.207:8080
+```
+
+If `/health` includes `permissions.accessibilityEnabled` and it is `false`, stop there and enable the AIVane accessibility service manually in Android Settings before running `--launch` or `--list`.
+On non-privileged devices, an ADB `WRITE_SECURE_SETTINGS` denial during helper startup is expected; treat `/health` permissions as the source of truth.
+
+Expected checkpoints:
+
+1. `start-app-repl.ps1` returns `/health` JSON (or at least shows the target URL and no fatal ADB failure).
+2. `--health` returns JSON service status.
+3. `--launch com.xingin.xhs` reports launch success.
+4. `--list` returns a non-empty UI tree.
 
 ## Troubleshooting
 

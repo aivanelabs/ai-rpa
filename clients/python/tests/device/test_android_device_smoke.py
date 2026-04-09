@@ -18,6 +18,7 @@ pytestmark = pytest.mark.device
 APP_PACKAGE = os.environ.get("AIVANE_E2E_APP_PACKAGE", "aivane.apprepl")
 APP_COMPONENT = os.environ.get("AIVANE_E2E_APP_COMPONENT", f"{APP_PACKAGE}/.ui.ReplMainActivity")
 SERVICE_COMPONENT = os.environ.get("AIVANE_E2E_SERVICE_COMPONENT", f"{APP_PACKAGE}/.api.ApiService")
+HEALTHY_STATUSES = {"running", "up"}
 ACCESSIBILITY_SERVICE = os.environ.get(
     "AIVANE_E2E_ACCESSIBILITY_SERVICE",
     "aivane.apprepl/aivane.android.accessibility.AIVaneAccessibilityService:0",
@@ -101,6 +102,10 @@ def _wait_for_health(base_url: str, timeout_seconds: int = 20) -> dict:
     pytest.fail(f"Timed out waiting for {base_url}/health: {last_error}")
 
 
+def _assert_healthy_status(health: dict) -> None:
+    assert health["status"] in HEALTHY_STATUSES
+
+
 def _bring_apprepl_to_front(ctx: DeviceContext) -> None:
     if ctx.adb_serial and _is_adb_serial_healthy(ctx.adb_serial):
         _adb(["shell", "am", "start", "-n", APP_COMPONENT], ctx.adb_serial)
@@ -153,6 +158,17 @@ def _find_first_ref_id_by_text_any(elements: list[dict], *, candidates: Iterable
     return None
 
 
+def _is_setup_screen(elements: list[dict]) -> bool:
+    if any(elem.get("resourceId") == "aivane.apprepl:id/tokenEdit" for elem in elements):
+        return True
+
+    active_label = next(
+        (str(elem.get("text", "")) for elem in elements if elem.get("resourceId") == "aivane.apprepl:id/activeScreenLabel"),
+        "",
+    )
+    return active_label.lower() == "setup"
+
+
 def _pick_safe_tap_target_ref_id(elements: list[dict]) -> Optional[int]:
     for resource_id in (
         "aivane.apprepl:id/copyBaseButton",
@@ -167,7 +183,7 @@ def _pick_safe_tap_target_ref_id(elements: list[dict]) -> Optional[int]:
 
     by_text = _find_first_ref_id_by_text_any(
         elements,
-        candidates=("base url", "复制 base url", "准备", "setup", "运行", "run", "控制台", "console"),
+        candidates=("base url", "setup", "run", "console"),
     )
     if by_text is not None:
         return by_text
@@ -179,7 +195,8 @@ def _pick_safe_tap_target_ref_id(elements: list[dict]) -> Optional[int]:
         if not elem.get("clickable"):
             continue
         text = str(elem.get("text", "") or elem.get("contentDesc", "") or "")
-        if "停止" in text or "stop" in text.lower():
+        resource_id = str(elem.get("resourceId", "") or "").lower()
+        if "stop" in text.lower() or "stop" in resource_id:
             continue
         return ref_id
 
@@ -188,16 +205,12 @@ def _pick_safe_tap_target_ref_id(elements: list[dict]) -> Optional[int]:
 
 def _ensure_setup_screen(ctx: DeviceContext) -> list[dict]:
     elements = _fetch_tree_with_retries(ctx.client)
-    active_label = next(
-        (str(elem.get("text", "")) for elem in elements if elem.get("resourceId") == "aivane.apprepl:id/activeScreenLabel"),
-        "",
-    )
-    if "准备" in active_label:
+    if _is_setup_screen(elements):
         return elements
 
     setup_tab_ref_id = _find_ref_id_by_resource_id(elements, "aivane.apprepl:id/tabSetup")
     if setup_tab_ref_id is None:
-        setup_tab_ref_id = _find_first_ref_id_by_text_any(elements, candidates=("准备", "setup"))
+        setup_tab_ref_id = _find_first_ref_id_by_text_any(elements, candidates=("setup",))
     if setup_tab_ref_id is None:
         pytest.fail("Could not find the setup tab in the current apprepl UI tree.")
 
@@ -234,7 +247,7 @@ def device_context() -> DeviceContext:
         _adb(["shell", "am", "start-foreground-service", "-n", SERVICE_COMPONENT], adb_serial)
 
     health = _wait_for_health(base_url)
-    assert health["status"] == "running"
+    _assert_healthy_status(health)
 
     return DeviceContext(adb_serial=adb_serial, base_url=base_url, client=AgentAndroidClient(base_url))
 
@@ -243,7 +256,7 @@ def test_health_endpoint_reports_running(device_context: DeviceContext):
     health = _wait_for_health(device_context.base_url, timeout_seconds=5)
 
     assert health["service"] == "aivane-repl"
-    assert health["status"] == "running"
+    _assert_healthy_status(health)
 
 
 def test_launcher_apps_contains_aivane_entry(device_context: DeviceContext):

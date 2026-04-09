@@ -12,7 +12,7 @@ This document summarizes the permissions the Android REPL beta requests and why 
 
 ## Local Network / Token
 
-- The desktop agent communicates with the device over LAN (`http://<device-ip>:8080`). The health endpoint (`/health`) always reports basic service status. Some builds also include a `permissions` object for accessibility, overlay, and screenshot readiness. There is no transport encryption in this beta, so keep the device on a trusted network segment.
+- The desktop agent communicates with the device over LAN (`http://<device-ip>:8080`). The health endpoint (`/health`) reports basic service status plus a `permissions` object for accessibility, overlay, and screenshot readiness. There is no transport encryption in this beta, so keep the device on a trusted network segment.
 - The service runs on the phone itself for this public beta. The local-first path avoids uploading UI data or screenshots to a cloud relay during normal use.
 - Because the public path is direct device-to-desktop communication, current control is limited to the same LAN. A later optional server-side path may expand that boundary.
 - If you enable a shared token on the phone, the Python client can send it via `--token YOUR_TOKEN`, the `AIVANE_API_TOKEN` environment variable, or `set token YOUR_TOKEN` inside the REPL.
