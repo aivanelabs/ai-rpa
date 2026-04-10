@@ -26,7 +26,7 @@ curl http://<device-ip>:8080/health
 3. List launcher apps:
 
 ```bash
-python ../../clients/python/agent-android.py --apps --url http://<device-ip>:8080
+agent-android --apps --url http://<device-ip>:8080
 ```
 
 4. Launch the target app.

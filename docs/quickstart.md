@@ -6,7 +6,7 @@ This quickstart introduces the public GitHub beta for AIVane (AI Mobile Automati
 
 - An Android device with the AIVane REPL beta APK installed
 - A desktop or laptop on the same LAN
-- Python 3.7+
+- Python 3.9+
 - `curl` or a browser to test `http://<device-ip>:8080/health`
 
 ## Why The Phone Hosts The Service
@@ -34,11 +34,14 @@ If `/health` does not respond yet, go to [install-agent-android.md](install-agen
 
 Use these checkpoints to avoid guessing:
 
-1. `curl http://<device-ip>:8080/health`
+1. `python -m pip install aivane-agent-android`
+   This installs the `agent-android` command locally.
+   On Windows, if the command is not found afterwards, run `py -m site --user-base`, then check the `Scripts` subdirectory under that location and reopen the terminal after updating `PATH`.
+2. `curl http://<device-ip>:8080/health`
    Success should be JSON, not a timeout or connection-refused error. The payload should include basic service status and a `permissions` object.
-2. `python clients/python/agent-android.py --health --url http://<device-ip>:8080`
+3. `agent-android --health --url http://<device-ip>:8080`
    Success should print formatted JSON from the same `/health` endpoint.
-3. `python clients/python/agent-android.py --repl --url http://<device-ip>:8080`
+4. `agent-android --repl --url http://<device-ip>:8080`
    Success should open the interactive REPL and print a banner like:
 
 ```text
@@ -47,13 +50,13 @@ Server: http://<device-ip>:8080
 Type 'h' for help, 'q' to quit.
 ```
 
-4. Inside the REPL, run `health`, then `apps`.
+5. Inside the REPL, run `health`, then `apps`.
    If `health` fails here, do not keep guessing at UI commands. Fix connectivity first.
 
 Run the CLI with an explicit URL:
 
 ```bash
-python clients/python/agent-android.py --repl --url http://<device-ip>:8080
+agent-android --repl --url http://<device-ip>:8080
 ```
 
 Inside the REPL, save the URL for later:
@@ -73,41 +76,41 @@ curl http://<device-ip>:8080/health
 2. List launchable apps:
 
 ```bash
-python clients/python/agent-android.py --apps --url http://<device-ip>:8080
+agent-android --apps --url http://<device-ip>:8080
 ```
 
 3. Launch an app:
 
 ```bash
-python clients/python/agent-android.py --launch <package> --url http://<device-ip>:8080
+agent-android --launch <package> --url http://<device-ip>:8080
 ```
 
 4. Inspect the current screen:
 
 ```bash
-python clients/python/agent-android.py --list --url http://<device-ip>:8080
+agent-android --list --url http://<device-ip>:8080
 ```
 
 5. Interact:
 
 ```bash
-python clients/python/agent-android.py --tap <refId> --url http://<device-ip>:8080
-python clients/python/agent-android.py --input <refId> "hello" --url http://<device-ip>:8080
-python clients/python/agent-android.py --back --url http://<device-ip>:8080
+agent-android --tap <refId> --url http://<device-ip>:8080
+agent-android --input <refId> "hello" --url http://<device-ip>:8080
+agent-android --back --url http://<device-ip>:8080
 ```
 
 ## Notes
 
 - `/execute` remains available for advanced multi-step templates.
 - The public protocol may be narrowed and cleaned up before release.
-- Public sample skills are available under [`skills/`](../skills/), but this repo does not yet provide a one-click installer for Codex, Claude Code, or OpenClaw. Treat them as reference prompts/workflows unless your agent platform already supports local skill files.
+- Public sample skills are available under [`skills/`](../skills/), and the checked-in `agent-android` skill can be installed directly from GitHub after the CLI is installed.
 
 ## Skills Versus CLI
 
 If you are trying the beta for the first time, start with the CLI first:
 
 1. Verify `/health`
-2. Run `python clients/python/agent-android.py --help`
+2. Run `agent-android --help`
 3. Run one smoke flow in the REPL
 4. Only then wrap that flow in your own agent skill/prompt
 
@@ -118,7 +121,7 @@ This avoids mixing two separate onboarding problems: device connectivity and age
 If you want to wrap the public CLI in a Codex skill after the smoke flow works, create a local skill/prompt that says:
 
 ```text
-Use the AIVane Android public client at `clients/python/agent-android.py`.
+Use the `agent-android` CLI.
 
 Default loop:
 1. Verify `--health --url http://<device-ip>:8080`
@@ -165,9 +168,9 @@ If you prefer a non-interactive first pass on Windows, run this checkpoint chain
 
 ```powershell
 .\examples\start-app-repl.ps1 192.168.3.207 .\aivane.apk
-python .\clients\python\agent-android.py --health --url http://192.168.3.207:8080
-python .\clients\python\agent-android.py --launch com.xingin.xhs --url http://192.168.3.207:8080
-python .\clients\python\agent-android.py --list --url http://192.168.3.207:8080
+agent-android --health --url http://192.168.3.207:8080
+agent-android --launch com.xingin.xhs --url http://192.168.3.207:8080
+agent-android --list --url http://192.168.3.207:8080
 ```
 
 If `/health` includes `permissions.accessibilityEnabled` and it is `false`, stop there and enable the AIVane accessibility service manually in Android Settings before running `--launch` or `--list`.

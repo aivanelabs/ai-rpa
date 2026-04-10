@@ -1,12 +1,12 @@
 # Agent Examples — Android REPL Beta
 
-These prompt snippets show how Codex, Claude Code, or OpenClaw can call the agent-android via the public `agent-android.py` entrypoint.
+These prompt snippets show how Codex, Claude Code, or OpenClaw can call the installed `agent-android` CLI.
 
 ## Codex (plain CLI)
 
 ```
-Use the agent-android client at `clients/python/agent-android.py`.
-1. Run `python agent-android.py --repl --url http://<device-ip>:8080`.
+Use the installed `agent-android` CLI.
+1. Run `agent-android --repl --url http://<device-ip>:8080`.
 2. Save the URL (`set url http://<device-ip>:8080`).
 3. Use `apps`, `la com.xingin.xhs`, `list`, `tap 127`, `input 3 "hello"`, `back`, `press home`.
 4. Request `screenshot` if MediaProjection permission is granted.
@@ -17,8 +17,8 @@ Use the agent-android client at `clients/python/agent-android.py`.
 ```
 Goal: Open Xiaohongshu, search for a keyword, and inspect the first screen of results.
 
-Use the public client at `clients/python/agent-android.py`.
-1. Verify connectivity with `python clients/python/agent-android.py --health --url http://<device-ip>:8080`.
+Use the installed `agent-android` CLI.
+1. Verify connectivity with `agent-android --health --url http://<device-ip>:8080`.
 2. List apps with `--apps` and launch Xiaohongshu with `--launch com.xingin.xhs`.
 3. Inspect the current UI with `--list`.
 4. Find the search entry point with `--text Search`, `--inputs`, or another fresh `--list`.

@@ -93,7 +93,7 @@ def require_base_url(cmdline_url: Optional[str]) -> str:
         return url
     print(
         "AIVane server URL is required. Provide it via `--url` or run "
-        "`python agent-android.py --repl` and `set url <url>` to persist it under "
+        "`agent-android --repl` and `set url <url>` to persist it under "
         f"{CONFIG_FILE_PATH}.",
         file=sys.stderr,
     )

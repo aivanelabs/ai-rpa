@@ -6,7 +6,7 @@ This directory holds public skills for the `aivanelabs/ai-rpa` GitHub beta.
 
 - `agent-android/`
   - Public Android phone control REPL skill
-  - Uses the public Python CLI
+  - Uses the installed `agent-android` CLI
   - Focuses on LAN connectivity, launcher app discovery, launch, inspect, and stepwise interaction
 
 ## Planned Targets
@@ -22,17 +22,22 @@ Keep them aligned with the checked-in protocol, CLI, and docs in this repository
 
 ## How To Use Them Today
 
-- Treat these skills as public reference prompts and workflow guides.
-- This repo does not yet ship a one-click installer for Codex, Claude Code, or OpenClaw.
-- Start by validating the phone connection with the Python CLI.
-- After the CLI smoke flow works, copy or adapt the relevant skill text into your own agent environment.
+- Install the CLI first: `python -m pip install aivane-agent-android`
+- Install the skill from GitHub:
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+```
+
+- Start by validating the phone connection with the CLI.
+- After the smoke flow works, use the checked-in skill as-is or adapt it for your environment.
 
 ### Codex Example
 
-For Codex, the simplest starting point is to copy the core loop from `agent-android/SKILL.md` into your local skill or system prompt:
+For Codex, the simplest starting point is to use the installed skill or copy the core loop from `agent-android/SKILL.md`:
 
 ```text
-Use the AIVane Android public client at `clients/python/agent-android.py`.
+Use the `agent-android` CLI.
 Verify /health first, then inspect -> act -> inspect.
 Prefer `apps`, `launch`, `list`, `tap`, `input`, `swipe`, `back`, and `screenshot`.
 Re-run `list` after every UI action because refIds may change.

@@ -19,7 +19,7 @@ def test_main_apps_command_exits_zero_and_prints_app_list(monkeypatch, capsys):
             return [{"label": "Calculator", "package": "pkg.calc", "activity": "MainActivity"}]
 
     monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
-    monkeypatch.setattr(sys, "argv", ["agent-android.py", "--url", "http://device:8080", "--apps"])
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--apps"])
 
     with pytest.raises(SystemExit) as exc_info:
         cli_module.main()
@@ -40,7 +40,7 @@ def test_main_health_command_exits_zero_and_prints_payload(monkeypatch, capsys):
             return {"service": "aivane-repl", "status": "running"}
 
     monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
-    monkeypatch.setattr(sys, "argv", ["agent-android.py", "--url", "http://device:8080", "--health"])
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--health"])
 
     with pytest.raises(SystemExit) as exc_info:
         cli_module.main()
@@ -60,7 +60,7 @@ def test_main_health_command_failure_mentions_connection_hints(monkeypatch, caps
             return None
 
     monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
-    monkeypatch.setattr(sys, "argv", ["agent-android.py", "--url", "http://device:8080", "--health"])
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--health"])
 
     with pytest.raises(SystemExit) as exc_info:
         cli_module.main()
@@ -90,7 +90,7 @@ def test_main_list_raw_writes_output_file(monkeypatch, tmp_path, capsys):
         sys,
         "argv",
         [
-            "agent-android.py",
+            "agent-android",
             "--url",
             "http://device:8080",
             "--list",
@@ -124,7 +124,7 @@ def test_main_list_include_offscreen_passes_flag(monkeypatch, capsys):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["agent-android.py", "--url", "http://device:8080", "--list", "--include-offscreen", "--raw"],
+        ["agent-android", "--url", "http://device:8080", "--list", "--include-offscreen", "--raw"],
     )
 
     assert cli_module.main() == 0
@@ -146,7 +146,7 @@ def test_main_wait_for_command_reports_match(monkeypatch, capsys):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["agent-android.py", "--url", "http://device:8080", "--wait-for", "Search", "--timeout", "12"],
+        ["agent-android", "--url", "http://device:8080", "--wait-for", "Search", "--timeout", "12"],
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -171,7 +171,7 @@ def test_main_health_passes_token_to_client(monkeypatch):
             return {"service": "aivane-repl", "status": "running"}
 
     monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
-    monkeypatch.setattr(sys, "argv", ["agent-android.py", "--url", "http://device:8080", "--token", "shared-secret", "--health"])
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--token", "shared-secret", "--health"])
 
     with pytest.raises(SystemExit) as exc_info:
         cli_module.main()
@@ -200,7 +200,7 @@ def test_main_template_executes_payload_and_prints_response(monkeypatch, tmp_pat
     monkeypatch.setattr(
         sys,
         "argv",
-        ["agent-android.py", "--url", "http://device:8080", "--token", "shared-secret", "--template", str(template_path)],
+        ["agent-android", "--url", "http://device:8080", "--token", "shared-secret", "--template", str(template_path)],
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -225,7 +225,7 @@ def test_main_template_reports_missing_file(monkeypatch, capsys):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["agent-android.py", "--url", "http://device:8080", "--template", str(Path("missing-template.json"))],
+        ["agent-android", "--url", "http://device:8080", "--template", str(Path("missing-template.json"))],
     )
 
     with pytest.raises(SystemExit) as exc_info:

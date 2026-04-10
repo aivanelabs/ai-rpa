@@ -109,7 +109,7 @@ class AgentAndroidClient:
         try:
             req = urllib.request.Request(
                 url,
-                headers=self._build_headers(user_agent="agent-android.py/0.1")
+                headers=self._build_headers(user_agent="agent-android/0.1")
             )
             with self._opener.open(req, timeout=30) as response:
                 content = response.read()
@@ -897,6 +897,7 @@ class AgentAndroidClient:
             "back": "android.press.back",
             "home": "android.press.home",
             "recents": "android.press.recents",
+            "menu": "android.press.menu",
         }
         op_type = key_map.get(key.lower())
         if not op_type:
