@@ -248,3 +248,4 @@ def test_cli_help_mentions_new_repl_commands(capsys):
     assert "mx <ids>" in captured.out
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
+    assert "p <key>                   Press a system key (back/home/recents)" in captured.out

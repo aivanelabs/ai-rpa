@@ -453,6 +453,6 @@ def test_help_text_matches_current_xpath_and_press_usage(session, capsys):
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
     assert "x <N>" not in captured.out
-    assert "p <key>           Press a key (back/home/menu/enter/delete/power)" in captured.out
-    assert "Press a key (back/home/menu)" not in captured.out
+    assert "p <key>           Press a key (back/home/recents)" in captured.out
+    assert "Press a key (back/home/menu/enter/delete/power)" not in captured.out
     assert "set token <value>  Save the shared token (--clear to remove it)" in captured.out
