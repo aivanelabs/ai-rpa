@@ -54,7 +54,7 @@ REPL quick reference:
     s [path]                  Capture screenshot
     ux [path] [--all]         Print or save the current UI tree XML
     la <pkg>                  Launch an app by package name
-    p <key>                   Press a system key
+    p <key>                   Press a system key (back/home/recents)
     b                         Navigate back
     vars                      Show session variables
     set url <u>               Switch the server URL
@@ -102,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--health", action="store_true", help="Check service health from /health")
     group.add_argument("--back", action="store_true", help="Press back button")
     group.add_argument("--apps", action="store_true", help="List launcher apps from /apps")
-    group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / menu / enter / delete / power")
+    group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / recents")
     group.add_argument("--get-attr", nargs=2, metavar=("REFID", "ATTR"), help="Get element attribute by refId (text/className/bounds/...)")
     group.add_argument("--refId", "-r", type=int, metavar="N", help="Get element details")
     group.add_argument("--xpath", "-x", type=int, metavar="N", help="Get element XPath")

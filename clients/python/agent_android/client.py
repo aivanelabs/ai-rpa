@@ -891,15 +891,12 @@ class AgentAndroidClient:
         """
         Press a supported system key.
 
-        key: back / home / menu / enter / delete
+        key: back / home / recents
         """
         key_map = {
             "back": "android.press.back",
             "home": "android.press.home",
-            "menu": "android.press.menu",
-            "enter": "android.press.enter",
-            "delete": "android.press.delete",
-            "power": "android.press.power",
+            "recents": "android.press.recents",
         }
         op_type = key_map.get(key.lower())
         if not op_type:

@@ -76,7 +76,7 @@ class AriaReplSession:
         ('i', 'input',         'Input text (refId text)'),
         ('ix', 'inputx',       'Input text by XPath'),
         ('sw', 'swipe',        'Swipe (d/u/l/r)'),
-        ('p', 'press',         'Press a key (back/home/menu/enter/delete/power)'),
+        ('p', 'press',         'Press a key (back/home/recents)'),
         ('b', 'back',          'Press Back'),
         ('wf', 'waitfor',      'Wait for an element to appear'),
         ('g', 'get',           'Read an element attribute'),
@@ -930,9 +930,9 @@ class AriaReplSession:
         return self._cmd_swipe(args)
 
     def _cmd_press(self, args: List[str]) -> bool:
-        """p <key> - press a key (back/home/menu/enter/delete/power)."""
+        """p <key> - press a key (back/home/recents)."""
         if not args:
-            self._print_error("Usage: p <back|home|menu|enter|delete|power>")
+            self._print_error("Usage: p <back|home|recents>")
             return False
         ok = self.client.press_key(args[0])
         if ok:
@@ -1205,7 +1205,7 @@ class AriaReplSession:
             "                       Example: ix //EditText[@text='Search'] hello",
             "    sw <d|u|l|r> [--dur N] [--dist N]",
             "                       Swipe (d=down, u=up, l=left, r=right)",
-            "    p <key>           Press a key (back/home/menu/enter/delete/power)",
+            "    p <key>           Press a key (back/home/recents)",
             "    b                  Press Back",
             "",
             "  Wait",
