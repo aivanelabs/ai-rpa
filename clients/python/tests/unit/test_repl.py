@@ -23,8 +23,31 @@ class _DummyClient:
                 "text": "Search",
                 "contentDesc": "Search box",
                 "simpleClassName": "EditText",
+                "bounds": "[0,0][100,50]",
                 "x": 120,
                 "y": 240,
+                "focusable": True,
+                "xpath": "/WindowRoot/FrameLayout[1]/EditText[1]",
+            },
+            {
+                "refId": 6,
+                "text": "",
+                "contentDesc": "Card 2",
+                "simpleClassName": "FrameLayout",
+                "bounds": "[0,60][100,110]",
+                "x": 120,
+                "y": 320,
+                "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]",
+            },
+            {
+                "refId": 7,
+                "text": "",
+                "contentDesc": "Card 3",
+                "simpleClassName": "FrameLayout",
+                "bounds": "[0,120][100,170]",
+                "x": 120,
+                "y": 400,
+                "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[2]",
             }
         ]
 
@@ -42,6 +65,15 @@ class _DummyClient:
 
     def generate_xpath_candidates(self, _elem, _tree):
         return [("//EditText[@text='Search']", 1, "text")]
+
+    def generate_multi_xpath_candidates(self, elems, _tree):
+        ref_ids = [elem.get("refId") for elem in elems]
+        if ref_ids == [6, 7]:
+            return [
+                ("/hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]", 2, "same-parent positions"),
+                ("/hierarchy/RecyclerView[1]/FrameLayout", 2, "same-parent class"),
+            ]
+        return []
 
     def validate_xpath_runtime(self, xpath):
         return {
@@ -69,6 +101,21 @@ class _DummyClient:
         if xpath != "//many" and index == 0:
             return matches[0]
         return None
+
+    def get_ui_tree_xml(self, force_refresh=False, visible_only=True):
+        suffix = "visible" if visible_only else "all"
+        return f"<hierarchy source='{suffix}' refresh='{str(force_refresh).lower()}' />"
+
+    def get_node_snippet_for_element(self, elem, visible_only=True):
+        return f'<node index="{elem.get("refId")}" class="android.widget.{elem.get("simpleClassName")}" bounds="{elem.get("bounds")}" />'
+
+    def get_node_snippets_for_xpath(self, xpath, visible_only=True):
+        if xpath == "//many":
+            return [
+                '<node index="0" class="android.widget.EditText" bounds="[0,0][100,50]" />',
+                '<node index="1" class="android.widget.EditText" bounds="[0,50][100,100]" />',
+            ]
+        return []
 
     def input_to_element(self, ref_id, text):
         self.input_calls.append((ref_id, text))
@@ -122,6 +169,13 @@ def test_parse_line_supports_validatex_optional_index(session):
 
     assert command == "vx"
     assert args == ["//node[@text='Hello world']", "1"]
+
+
+def test_parse_line_keeps_validatenodes_xpath_with_spaces_inside_predicate(session):
+    command, args = session._parse_line("vn /hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]")
+
+    assert command == "vn"
+    assert args == ["/hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]"]
 
 
 def test_parse_line_uses_shell_style_splitting_for_regular_commands(session):
@@ -230,9 +284,87 @@ def test_cmd_validatex_prints_requested_match_detail(session, capsys):
     assert session._cmd_validatex(["//many", "1"]) is True
 
     captured = capsys.readouterr()
-    assert "Runtime match count: 2" in captured.out
-    assert "Match[1] refId: 8" in captured.out
-    assert "Center: (120, 320)" in captured.out
+    assert "XPath: //many" in captured.out
+    assert "matches: 2" in captured.out
+    assert "className: EditText" in captured.out
+    assert "position: (120, 320)" in captured.out
+
+
+def test_cmd_validatex_hides_refid_when_runtime_match_has_no_mapping(session, monkeypatch, capsys):
+    monkeypatch.setattr(
+        session.client,
+        "describe_xpath_match",
+        lambda xpath, index=0: {
+            "refId": None,
+            "className": "EditText",
+            "text": "Search",
+            "contentDescription": "Search box",
+            "bounds": "[0,0][100,50]",
+            "x": 120,
+            "y": 240,
+            "isInput": True,
+        },
+    )
+    assert session._cmd_validatex(["//unique"]) is True
+
+    captured = capsys.readouterr()
+    assert "matches: 1" in captured.out
+    assert "refId:" not in captured.out
+    assert "className: EditText" in captured.out
+    assert "status: input" in captured.out
+
+
+def test_cmd_validatex_match_zero_skips_empty_detail_card(session, monkeypatch, capsys):
+    monkeypatch.setattr(
+        session.client,
+        "validate_xpath_runtime",
+        lambda xpath: {
+            "xpath": xpath,
+            "count": 0,
+        },
+    )
+
+    assert session._cmd_validatex(["<node"]) is True
+
+    captured = capsys.readouterr()
+    assert "Runtime match count: 0" in captured.out
+    assert "No elements matched." in captured.out
+    assert "matches: 0" not in captured.out
+    assert "| className:" not in captured.out
+
+
+def test_cmd_ref_prints_bounds_and_status(session, capsys):
+    assert session._cmd_ref(["5"]) is True
+
+    captured = capsys.readouterr()
+    assert "refId: 5" in captured.out
+    assert "className: EditText" in captured.out
+    assert "bounds: [0,0][100,50]" in captured.out
+    assert "status: focusable" in captured.out
+
+
+def test_cmd_node_prints_raw_ui_tree_node_snippet(session, capsys):
+    assert session._cmd_node(["5"]) is True
+
+    captured = capsys.readouterr()
+    assert '<node index="5" class="android.widget.EditText" bounds="[0,0][100,50]" />' in captured.out
+
+
+def test_cmd_uitree_prints_current_ui_tree_xml(session, capsys):
+    assert session._cmd_uitree([]) is True
+
+    captured = capsys.readouterr()
+    assert "<hierarchy source='visible' refresh='true' />" in captured.out
+
+
+def test_cmd_uitree_supports_all_nodes_and_saving(session, tmp_path, capsys):
+    output_path = tmp_path / "ui-tree.xml"
+
+    assert session._cmd_uitree([str(output_path), "--all"]) is True
+
+    captured = capsys.readouterr()
+    assert "UI tree XML saved to" in captured.out
+    assert output_path.read_text(encoding="utf-8") == "<hierarchy source='all' refresh='true' />"
 
 
 def test_cmd_xpath_does_not_store_last_xpath_dead_state(session):
@@ -243,6 +375,65 @@ def test_cmd_xpath_does_not_store_last_xpath_dead_state(session):
     assert "LAST_XPATH" not in session.variables
     assert session.variables["LAST_UI_TREE_ABSOLUTE_XPATH"] == "/FrameLayout[1]/EditText[@text='Search']"
     assert session.variables["LAST_RUNTIME_ABSOLUTE_XPATH"] == "/hierarchy/FrameLayout[1]/EditText[@text='Search']"
+
+
+def test_cmd_xpath_hides_duplicate_ui_tree_absolute_path(session, monkeypatch, capsys):
+    monkeypatch.setattr(
+        session.client,
+        "build_ui_tree_absolute_xpath",
+        lambda _tree, _elem: "/hierarchy/FrameLayout[1]/EditText[@text='Search']",
+    )
+
+    assert session._cmd_xpath(["5"]) is True
+
+    captured = capsys.readouterr()
+    assert "UI tree absolute path:" not in captured.out
+    assert "Runtime absolute path:" in captured.out
+
+
+def test_cmd_xpath_filters_zero_match_candidates_from_main_list(session, monkeypatch, capsys):
+    monkeypatch.setattr(
+        session,
+        "_runtime_validate_candidates",
+        lambda _candidates: [
+            ("//zero", 0, "ancestor-relative", None),
+            ("//EditText[@text='Search']", 1, "text", {"className": "EditText", "text": "Search"}),
+            ("//EditText", 3, "className-only", None),
+        ],
+    )
+
+    assert session._cmd_xpath(["5"]) is True
+
+    captured = capsys.readouterr()
+    assert "//zero" not in captured.out
+    assert "//EditText[@text='Search']" in captured.out
+    assert "//EditText" in captured.out
+
+
+def test_cmd_multixpath_prints_shared_candidates(session, capsys):
+    assert session._cmd_multixpath(["6,7"]) is True
+
+    captured = capsys.readouterr()
+    assert "refIds=6,7  targetCount=2" in captured.out
+    assert "same-parent positions" in captured.out
+    assert "XPath: /hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]" in captured.out
+    assert "Recommended exact: /hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]" in captured.out
+
+
+def test_cmd_validatenodes_prints_all_matched_node_snippets(session, capsys):
+    assert session._cmd_validatenodes(["//many"]) is True
+
+    captured = capsys.readouterr()
+    assert "Matched node snippets: 2" in captured.out
+    assert '<node index="0" class="android.widget.EditText" bounds="[0,0][100,50]" />' in captured.out
+    assert '<node index="1" class="android.widget.EditText" bounds="[0,50][100,100]" />' in captured.out
+
+
+def test_cmd_multixpath_requires_at_least_two_ids(session, capsys):
+    assert session._cmd_multixpath(["6"]) is False
+
+    captured = capsys.readouterr()
+    assert "Provide at least two refIds" in captured.err
 
 
 def test_cmd_xpath_rejects_extra_arguments_with_usage(session, capsys):
@@ -257,6 +448,10 @@ def test_help_text_matches_current_xpath_and_press_usage(session, capsys):
 
     captured = capsys.readouterr()
     assert "x <refId>" in captured.out
+    assert "node <refId>" in captured.out
+    assert "mx <ids>" in captured.out
+    assert "vn <xpath>" in captured.out
+    assert "ux [path] [--all]" in captured.out
     assert "x <N>" not in captured.out
     assert "p <key>           Press a key (back/home/menu/enter/delete/power)" in captured.out
     assert "Press a key (back/home/menu)" not in captured.out
