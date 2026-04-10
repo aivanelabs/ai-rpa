@@ -234,3 +234,17 @@ def test_main_template_reports_missing_file(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert exc_info.value.code == 1
     assert "Template file not found:" in captured.err
+
+
+def test_cli_help_mentions_new_repl_commands(capsys):
+    parser = cli_module.build_parser()
+
+    with pytest.raises(SystemExit) as exc_info:
+        parser.parse_args(["--help"])
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "node <N>" in captured.out
+    assert "mx <ids>" in captured.out
+    assert "vn <xpath>" in captured.out
+    assert "ux [path] [--all]" in captured.out

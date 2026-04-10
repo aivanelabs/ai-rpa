@@ -39,8 +39,11 @@ REPL quick reference:
     ss / snapshot             Force-refresh the UI tree
     apps                      List launcher apps
     ref <N>                   Dump one element
+    node <N>                  Print the raw <node .../> XML snippet for refId=N
     x <N>                     Print XPath candidates for refId=N
+    mx <ids>                  Find shared XPath candidates for multiple refIds
     vx <xpath> [idx]          Validate XPath match count and inspect one runtime match
+    vn <xpath>                Print matched <node .../> snippets using runtime XPath results
     t <N>                     Tap element with refId=N
     tx <xpath>                Tap by XPath locator
     i <N> <text>              Enter text into refId=N (--clear or "" clears it)
@@ -49,6 +52,7 @@ REPL quick reference:
     wf <text>                 Wait for element text (use --t to override timeout)
     g <N> <attr>              Inspect an attribute for refId=N
     s [path]                  Capture screenshot
+    ux [path] [--all]         Print or save the current UI tree XML
     la <pkg>                  Launch an app by package name
     p <key>                   Press a system key
     b                         Navigate back
