@@ -17,7 +17,7 @@ Prerequisites:
   - `uv tool update-shell`
 - make sure `agent-android` is available on `PATH`
 - install the skill from GitHub with:
-  `npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y`
+  `npx skills add aivanelabs/ai-rpa --skill agent-android`
 
 The public path is local-first:
 
