@@ -15,15 +15,33 @@
 
 默认包名是：
 
+Windows：
+
+```powershell
+py -m pip install --user aivane-agent-android
+```
+
+Linux / macOS：
+
 ```bash
-python -m pip install aivane-agent-android
+python3 -m pip install --user aivane-agent-android
 ```
 
 升级命令：
 
-```bash
-python -m pip install --upgrade aivane-agent-android
+Windows：
+
+```powershell
+py -m pip install --user --upgrade aivane-agent-android
 ```
+
+Linux / macOS：
+
+```bash
+python3 -m pip install --user --upgrade aivane-agent-android
+```
+
+如果 Linux / macOS 上没有 `pip`，请先为 Python 3 安装 `pip`，再重试上面的命令。
 
 如果你在 Windows 上安装后找不到 `agent-android`，先运行：
 
@@ -32,6 +50,14 @@ py -m site --user-base
 ```
 
 然后检查输出目录下的 `Scripts` 子目录是否已加入 `PATH`，必要时加入后重新打开终端再试。
+
+如果你在 Linux / macOS 上安装后找不到 `agent-android`，先运行：
+
+```bash
+python3 -m site --user-base
+```
+
+然后检查对应的用户脚本目录是否已经加入 `PATH`。常见情况是 `~/.local/bin`。
 
 安装后直接使用：
 
@@ -54,15 +80,15 @@ npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -
 
 ```bash
 cd clients/python
-python -m pip install -e .
+python3 -m pip install -e .
 ```
 
 本地构建发行包：
 
 ```bash
 cd clients/python
-python -m pip install --upgrade build
-python -m build
+python3 -m pip install --upgrade build
+python3 -m build
 ```
 
 ## 快速开始

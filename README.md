@@ -17,15 +17,33 @@ The current public surface is **AIVane Android REPL Beta**: a local-first Androi
 
 The default package name is:
 
+Windows:
+
+```powershell
+py -m pip install --user aivane-agent-android
+```
+
+Linux / macOS:
+
 ```bash
-python -m pip install aivane-agent-android
+python3 -m pip install --user aivane-agent-android
 ```
 
 Upgrade it with:
 
-```bash
-python -m pip install --upgrade aivane-agent-android
+Windows:
+
+```powershell
+py -m pip install --user --upgrade aivane-agent-android
 ```
+
+Linux / macOS:
+
+```bash
+python3 -m pip install --user --upgrade aivane-agent-android
+```
+
+If `pip` is missing on Linux / macOS, install it for Python 3 first, then retry the command above.
 
 On Windows, if `agent-android` is not found after a user install, run:
 
@@ -34,6 +52,14 @@ py -m site --user-base
 ```
 
 Then check the `Scripts` subdirectory under that location, add it to `PATH` if needed, and reopen the terminal before retrying.
+
+On Linux / macOS, if `agent-android` is not found after a user install, run:
+
+```bash
+python3 -m site --user-base
+```
+
+Then check whether the corresponding user scripts directory is on `PATH`. A common example is `~/.local/bin`.
 
 After install, the command is:
 
@@ -58,15 +84,15 @@ For local development, work inside [`clients/python`](clients/python):
 
 ```bash
 cd clients/python
-python -m pip install -e .
+python3 -m pip install -e .
 ```
 
 Build distributions locally with:
 
 ```bash
 cd clients/python
-python -m pip install --upgrade build
-python -m build
+python3 -m pip install --upgrade build
+python3 -m build
 ```
 
 ## Quick Start
