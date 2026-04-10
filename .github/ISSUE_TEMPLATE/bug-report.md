@@ -25,7 +25,7 @@ What actually happened?
 
 ### Environment
 
-- `agent-android.py --version` (if available):
+- `agent-android --version`:
 - Device IP / model:
 - ADB/CLI environment (OS, Python 3.x):
 

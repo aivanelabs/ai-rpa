@@ -8,7 +8,7 @@ This document summarizes the permissions the Android REPL beta requests and why 
 
 ## Screenshot / MediaProjection
 
-- Capturing screenshots uses Android’s `MediaProjection` API. Users must grant screenshot permission after launching `agent-android.py --screenshot` once. The CLI falls back to template-based captures when the permission is absent. The permission prompt is shown by the system (not the app), and users can revoke it later.
+- Capturing screenshots uses Android’s `MediaProjection` API. Users must grant screenshot permission after running `agent-android --screenshot` once. The CLI falls back to template-based captures when the permission is absent. The permission prompt is shown by the system (not the app), and users can revoke it later.
 
 ## Local Network / Token
 

@@ -4,7 +4,7 @@ Thank you for helping shape the public `aivanelabs/ai-rpa` experience!
 
 ## What to contribute
 
-- Improvements to the Python `clients/python/agent-android.py` REPL surface
+- Improvements to the Python `clients/python/` package and `agent-android` CLI surface
 - Enhancements and clarifications to the `docs/` quickstart, protocol, and smoke guidance
 - Example sequences located under `examples/`
 - Skills under `skills/`, particularly `agent-android`

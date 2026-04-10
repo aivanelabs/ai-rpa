@@ -65,8 +65,14 @@ If you are not using ADB, do this manually on the phone before moving on:
 
 ## 4. Run the first smoke
 
+Install the desktop CLI first:
+
+```bash
+python -m pip install aivane-agent-android
+```
+
 1. Open the REPL client:  
-   `python clients/python/agent-android.py --repl --url http://<device-ip>:8080`
+   `agent-android --repl --url http://<device-ip>:8080`
 2. Inside the REPL save the URL (`set url ...`) and run: `health`, `apps`, `la <package>`, `list`, `tap <refId>`, `input <refId>`, `back`, `press home`.
 3. If you granted screenshot permission, run `screenshot` to confirm capture.
 
@@ -76,9 +82,14 @@ This smoke ensures the base APIs and CLI actions function before automating larg
 
 This repository ships public skill references under [`skills/`](../skills/), especially [`skills/agent-android/SKILL.md`](../skills/agent-android/SKILL.md).
 
-- Today the public beta is still CLI-first.
-- There is no one-click installer in this repo for Codex, Claude Code, or OpenClaw.
-- Use the skill files as copyable reference prompts/workflows for your agent environment after you have already confirmed the CLI smoke flow works.
+- Install the CLI first: `python -m pip install aivane-agent-android`
+- Install the skill with:
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+```
+
+- Confirm the CLI smoke flow works before relying on the skill in a larger automation loop.
 
 ## If Python calls stop working
 

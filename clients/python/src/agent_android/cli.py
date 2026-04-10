@@ -6,6 +6,7 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from . import __version__
 from .client import AgentAndroidClient
 from .config import TOKEN_ENV_VAR, require_base_url, resolve_api_token
 from .formatting import _format_launcher_app, format_element, print_tree
@@ -18,20 +19,20 @@ directly to http://<device-ip>:8080. The public path is local-first and
 does not require a cloud relay for the basic smoke flow.
 
 Quick start:
-    python agent-android.py --repl --url http://<device-ip>:8080
-    python agent-android.py --health --url http://<device-ip>:8080
-    python agent-android.py --health --url http://<device-ip>:8080 --token YOUR_TOKEN
-    python agent-android.py --apps --url http://<device-ip>:8080
-    python agent-android.py --list --url http://<device-ip>:8080
+    agent-android --repl --url http://<device-ip>:8080
+    agent-android --health --url http://<device-ip>:8080
+    agent-android --health --url http://<device-ip>:8080 --token YOUR_TOKEN
+    agent-android --apps --url http://<device-ip>:8080
+    agent-android --list --url http://<device-ip>:8080
 
 One-off examples:
-    python agent-android.py --launch com.example.app --url http://<device-ip>:8080
-    python agent-android.py --tap 7 --url http://<device-ip>:8080
-    python agent-android.py --input 7 "hello world" --url http://<device-ip>:8080
-    python agent-android.py --template template.json --url http://<device-ip>:8080
-    python agent-android.py --swipe up --url http://<device-ip>:8080
-    python agent-android.py --screenshot --url http://<device-ip>:8080
-    python agent-android.py --wait-for Search --timeout 30 --url http://<device-ip>:8080
+    agent-android --launch com.example.app --url http://<device-ip>:8080
+    agent-android --tap 7 --url http://<device-ip>:8080
+    agent-android --input 7 "hello world" --url http://<device-ip>:8080
+    agent-android --template template.json --url http://<device-ip>:8080
+    agent-android --swipe up --url http://<device-ip>:8080
+    agent-android --screenshot --url http://<device-ip>:8080
+    agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
 
 REPL quick reference:
     health / hl               Check the /health endpoint
@@ -77,6 +78,7 @@ Troubleshooting:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="agent-android",
         description="agent-android v0.1 - local-first Android UI automation over the public AIVane REPL surface",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=EPILOG,
@@ -116,6 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
 
 

@@ -7,13 +7,13 @@
 
 ## Highlights
 
-- Exposed the Python REPL client (`clients/python/agent-android.py`) that talks to `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, and `/download`.
+- Exposed the Python REPL client as the installable `agent-android` CLI that talks to `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, and `/download`.
 - Added launcher-app discovery, tap/input/swipe/back/home/stop operations, and a small smoke flow documentation.
 - Published the public permission notes, known limitations, and release checklist for `aivanelabs/ai-rpa`.
 
 ## Behavior Notes
 
-- `agent-android.py --apps` lists all launcher-ready packages returned by `/apps`.
+- `agent-android --apps` lists all launcher-ready packages returned by `/apps`.
 - `--screenshot` uses Android’s MediaProjection flow and succeeds after first-run permission is granted.
 - `/stop` is available as a remote stop signal for the current task.
 

@@ -1,11 +1,18 @@
 ---
 name: agent-android
-description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher apps and UI state, and control the phone step by step through the public REPL/CLI path. Use this when Codex needs Android phone control for AI-agent tasks such as checking device connectivity, listing launchable apps, launching an app, inspecting the current UI tree, tapping, inputting text, swiping, navigating back/home, taking screenshots, or running a small end-to-end smoke flow with the public Python client.
+description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher apps and UI state, and control the phone step by step through the public REPL/CLI path. Use this when Codex needs Android phone control for AI-agent tasks such as checking device connectivity, listing launchable apps, launching an app, inspecting the current UI tree, tapping, inputting text, swiping, navigating back/home, taking screenshots, or running a small end-to-end smoke flow with the public CLI.
 ---
 
 # Android REPL
 
 Use this skill to drive an Android device through the public `agent-android` beta surface published in the `aivanelabs/ai-rpa` repo.
+
+Prerequisites:
+
+- install the CLI first: `python -m pip install aivane-agent-android`
+- make sure `agent-android` is available on `PATH`
+- install the skill from GitHub with:
+  `npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y`
 
 The public path is local-first:
 
@@ -34,7 +41,7 @@ Keep the loop short. Prefer inspect -> act -> inspect over long speculative comm
 Start the REPL:
 
 ```bash
-python ../../clients/python/agent-android.py --repl --url http://<device-ip>:8080
+agent-android --repl --url http://<device-ip>:8080
 ```
 
 Save the current device URL inside the REPL:
@@ -46,7 +53,7 @@ set url http://<device-ip>:8080
 Built-in help:
 
 ```bash
-python ../../clients/python/agent-android.py --help
+agent-android --help
 ```
 
 ```text
@@ -59,30 +66,30 @@ Use the one-off CLI when you already know the exact action you want.
 
 ```bash
 # Connectivity
-python ../../clients/python/agent-android.py --health --url http://<device-ip>:8080
+agent-android --health --url http://<device-ip>:8080
 
 # Discovery
-python ../../clients/python/agent-android.py --apps --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --list --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --id com.example:id/search --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --text Search --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --inputs --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --refId 7 --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --xpath 7 --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --get-attr 7 text --url http://<device-ip>:8080
+agent-android --apps --url http://<device-ip>:8080
+agent-android --list --url http://<device-ip>:8080
+agent-android --id com.example:id/search --url http://<device-ip>:8080
+agent-android --text Search --url http://<device-ip>:8080
+agent-android --inputs --url http://<device-ip>:8080
+agent-android --refId 7 --url http://<device-ip>:8080
+agent-android --xpath 7 --url http://<device-ip>:8080
+agent-android --get-attr 7 text --url http://<device-ip>:8080
 
 # Actions
-python ../../clients/python/agent-android.py --launch com.xingin.xhs --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --tap 7 --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --input 7 "hello world" --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --swipe up --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --back --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --press home --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --screenshot --url http://<device-ip>:8080
+agent-android --launch com.xingin.xhs --url http://<device-ip>:8080
+agent-android --tap 7 --url http://<device-ip>:8080
+agent-android --input 7 "hello world" --url http://<device-ip>:8080
+agent-android --swipe up --url http://<device-ip>:8080
+agent-android --back --url http://<device-ip>:8080
+agent-android --press home --url http://<device-ip>:8080
+agent-android --screenshot --url http://<device-ip>:8080
 
 # Waiting and output
-python ../../clients/python/agent-android.py --wait-for Search --timeout 30 --url http://<device-ip>:8080
-python ../../clients/python/agent-android.py --list --raw --output tree.json --url http://<device-ip>:8080
+agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
+agent-android --list --raw --output tree.json --url http://<device-ip>:8080
 ```
 
 ## REPL Command Reference
@@ -124,7 +131,7 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
   Use `ix <xpath> --` or `--clear` to clear the field.
 - `sw <d|u|l|r> [--dur N] [--dist N]` or `swipe ...`
   Swipe down/up/left/right with optional duration and distance.
-- `p <back|home|menu|enter|delete|power>` or `press ...`
+- `p <back|home|recents>` or `press ...`
   Press a system key.
 - `b` or `back`
   Press Back.
@@ -203,6 +210,7 @@ ix //EditText[@text='Search'] -- hello world
 ## Troubleshooting
 
 - If a Python call fails, first check whether the AIVane app or phone-side API service has exited.
+- If `agent-android` is not found, install or upgrade the CLI first: `python -m pip install --upgrade aivane-agent-android`
 - Re-open the app or restart the phone-side service, then retry `curl http://<device-ip>:8080/health`.
 - If `health` works but UI commands fail, run `ss` to force-refresh the tree before tapping or inputting.
 - If `tx` or `ix` fails, run `vx <xpath>` and make sure the XPath resolves to exactly one runtime match.
@@ -221,8 +229,8 @@ Stop and ask for user help when:
 
 ## References
 
-- Smoke checklist: [references/smoke-flow.md](references/smoke-flow.md)
-- Quickstart: [../../docs/quickstart.md](../../docs/quickstart.md)
-- Install guide: [../../docs/install-agent-android.md](../../docs/install-agent-android.md)
-- Public protocol: [../../docs/protocol-v1.md](../../docs/protocol-v1.md)
-- Known beta limits: [../../docs/known-limitations.md](../../docs/known-limitations.md)
+- Smoke checklist: [GitHub](https://github.com/aivanelabs/ai-rpa/blob/main/skills/agent-android/references/smoke-flow.md)
+- Quickstart: [GitHub](https://github.com/aivanelabs/ai-rpa/blob/main/docs/quickstart.md)
+- Install guide: [GitHub](https://github.com/aivanelabs/ai-rpa/blob/main/docs/install-agent-android.md)
+- Public protocol: [GitHub](https://github.com/aivanelabs/ai-rpa/blob/main/docs/protocol-v1.md)
+- Known beta limits: [GitHub](https://github.com/aivanelabs/ai-rpa/blob/main/docs/known-limitations.md)
