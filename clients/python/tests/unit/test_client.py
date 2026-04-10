@@ -259,6 +259,107 @@ def test_find_by_text_matches_text_and_content_description_fields(client):
     assert [elem["refId"] for elem in matches] == [1, 2, 3]
 
 
+def test_build_tree_structure_preserves_original_ui_order_for_parentage(client):
+    tree = [
+        {
+            "refId": 1,
+            "simpleClassName": "RecyclerView",
+            "xpath": "/WindowRoot/RecyclerView[1]",
+        },
+        {
+            "refId": 2,
+            "text": "刚刚在看的内容",
+            "simpleClassName": "TextView",
+            "xpath": "/WindowRoot/RecyclerView[1]/TextView[1]",
+        },
+        {
+            "refId": 3,
+            "simpleClassName": "FrameLayout",
+            "contentDesc": "笔记A",
+            "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]",
+        },
+        {
+            "refId": 4,
+            "simpleClassName": "TextView",
+            "text": "卡片标题",
+            "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]/TextView[1]",
+        },
+    ]
+
+    nodes = client._build_tree_structure(tree)
+
+    assert nodes[2]["parent_ref_id"] == 1
+    assert nodes[3]["parent_ref_id"] == 1
+    assert nodes[4]["parent_ref_id"] == 3
+
+
+def test_ancestor_relative_xpath_does_not_treat_prior_sibling_header_as_ancestor(client):
+    tree = [
+        {
+            "refId": 1,
+            "simpleClassName": "RecyclerView",
+            "xpath": "/WindowRoot/RecyclerView[1]",
+        },
+        {
+            "refId": 2,
+            "text": "刚刚在看的内容",
+            "simpleClassName": "TextView",
+            "xpath": "/WindowRoot/RecyclerView[1]/TextView[1]",
+        },
+        {
+            "refId": 3,
+            "simpleClassName": "FrameLayout",
+            "contentDesc": "笔记A",
+            "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]",
+        },
+        {
+            "refId": 4,
+            "text": "卡片标题",
+            "simpleClassName": "TextView",
+            "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]/TextView[1]",
+        },
+    ]
+
+    xpath = client._ancestor_to_target_path(tree, 3)
+
+    assert xpath is None
+
+
+def test_generate_multi_xpath_candidates_prefers_exact_position_match(client, monkeypatch):
+    tree = [
+        {"refId": 1, "simpleClassName": "RecyclerView", "xpath": "/WindowRoot/RecyclerView[1]"},
+        {"refId": 13, "simpleClassName": "FrameLayout", "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[1]"},
+        {"refId": 14, "simpleClassName": "FrameLayout", "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[2]"},
+        {"refId": 15, "simpleClassName": "FrameLayout", "xpath": "/WindowRoot/RecyclerView[1]/FrameLayout[3]"},
+    ]
+    selected = [tree[1], tree[2]]
+    counts = {
+        "/hierarchy/RecyclerView[1]/FrameLayout[1] | /hierarchy/RecyclerView[1]/FrameLayout[2]": 2,
+        "/hierarchy/RecyclerView[1]/FrameLayout": 3,
+        "/hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]": 2,
+        "/hierarchy/RecyclerView[1]/FrameLayout[position()>=1 and position()<=2]": 2,
+    }
+    monkeypatch.setattr(client, "_get_xpath_match_count", lambda xpath: counts.get(xpath))
+    monkeypatch.setattr(
+        client,
+        "build_runtime_absolute_xpath",
+        lambda _tree, elem: f"/hierarchy/RecyclerView[1]/FrameLayout[{1 if elem['refId'] == 13 else 2 if elem['refId'] == 14 else 3}]",
+    )
+
+    candidates = client.generate_multi_xpath_candidates(selected, tree)
+
+    assert candidates[0] == (
+        "/hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]",
+        2,
+        "same-parent positions",
+    )
+    assert (
+        "/hierarchy/RecyclerView[1]/FrameLayout",
+        3,
+        "same-parent class",
+    ) in candidates
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -307,6 +408,92 @@ def test_describe_xpath_match_returns_selected_match_details(client, monkeypatch
         "resourceId": "pkg:id/search",
         "isInput": True,
     }
+
+
+def test_get_node_snippet_for_element_returns_self_closing_xml_node(client, monkeypatch):
+    monkeypatch.setattr(
+        client,
+        "get_ui_tree_xml",
+        lambda **_kwargs: '<hierarchy><node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" /></hierarchy>',
+    )
+    elem = {
+        "refId": 1,
+        "simpleClassName": "FrameLayout",
+        "contentDesc": "Card 1",
+        "bounds": "[0,0][10,10]",
+    }
+
+    snippet = client.get_node_snippet_for_element(elem)
+
+    assert snippet == '<node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" />'
+
+
+def test_get_node_snippets_for_xpath_returns_all_matched_node_snippets(client, monkeypatch):
+    tree = [
+        {"refId": 1, "simpleClassName": "FrameLayout", "contentDesc": "Card 1", "bounds": "[0,0][10,10]"},
+        {"refId": 2, "simpleClassName": "FrameLayout", "contentDesc": "Card 2", "bounds": "[10,0][20,10]"},
+    ]
+    monkeypatch.setattr(
+        client,
+        "get_ui_tree_xml",
+        lambda **_kwargs: (
+            '<hierarchy>'
+            '<node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" />'
+            '<node index="1" class="android.widget.FrameLayout" content-desc="Card 2" bounds="[10,0][20,10]" />'
+            '</hierarchy>'
+        ),
+    )
+    monkeypatch.setattr(
+        client,
+        "_get_xpath_runtime_summaries",
+        lambda _xpath: [
+            {"text": "Card 1", "className": "android.widget.FrameLayout"},
+            {"text": "Card 2", "className": "android.widget.FrameLayout"},
+        ],
+    )
+
+    snippets = client.get_node_snippets_for_xpath("//FrameLayout")
+
+    assert snippets == [
+        '<node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" />',
+        '<node index="1" class="android.widget.FrameLayout" content-desc="Card 2" bounds="[10,0][20,10]" />',
+    ]
+
+
+def test_get_node_snippets_for_xpath_uses_runtime_summaries_for_positions(client, monkeypatch):
+    monkeypatch.setattr(
+        client,
+        "get_ui_tree_xml",
+        lambda **_kwargs: (
+            '<hierarchy>'
+            '<node class="android.widget.RecyclerView">'
+            '<node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" />'
+            '<node index="1" class="android.widget.FrameLayout" content-desc="Card 2" bounds="[10,0][20,10]" />'
+            '<node index="2" class="android.widget.FrameLayout" content-desc="Card 3" bounds="[20,0][30,10]" />'
+            '<node index="0" class="android.widget.TextView" text="Other" bounds="[0,20][10,30]" />'
+            '</node>'
+            '</hierarchy>'
+        ),
+    )
+    monkeypatch.setattr(
+        client,
+        "_get_xpath_runtime_summaries",
+        lambda _xpath: [
+            {"text": "Card 1", "className": "android.widget.FrameLayout"},
+            {"text": "Card 2", "className": "android.widget.FrameLayout"},
+            {"text": "Card 3", "className": "android.widget.FrameLayout"},
+        ],
+    )
+
+    snippets = client.get_node_snippets_for_xpath(
+        "/hierarchy/RecyclerView/FrameLayout[position()=1 or position()=2]"
+    )
+
+    assert snippets == [
+        '<node index="0" class="android.widget.FrameLayout" content-desc="Card 1" bounds="[0,0][10,10]" />',
+        '<node index="1" class="android.widget.FrameLayout" content-desc="Card 2" bounds="[10,0][20,10]" />',
+        '<node index="2" class="android.widget.FrameLayout" content-desc="Card 3" bounds="[20,0][30,10]" />',
+    ]
 
 
 def test_input_by_xpath_rejects_non_input_match(client, monkeypatch, capsys):

@@ -35,35 +35,64 @@ def _format_launcher_app(app: Dict[str, Any]) -> str:
     return _terminal_text(f"{label} - {package}{extra_text} [{activity}]")
 
 
-def format_element(elem: Dict[str, Any]) -> str:
-    lines = []
-    ref_id = elem.get("refId", "?")
-    text = elem.get("text", "")
-    desc = elem.get("contentDesc", "")
-    resource_id = elem.get("resourceId", "")
-    cls = elem.get("simpleClassName", "")
-    x, y = elem.get("x", "?"), elem.get("y", "?")
+def _short_class_name(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "-"
+    return text.rsplit(".", 1)[-1]
 
-    lines.append("+" + "-" * 60 + "+")
-    lines.append("| refId: {}".format(ref_id))
-    lines.append("|" + "-" * 61 + "|")
-    if text:
-        lines.append("| text: {}".format(_terminal_text(text[:50])))
-    if desc:
-        lines.append("| contentDesc: {}".format(_terminal_text(desc[:50])))
-    if resource_id:
-        lines.append("| resourceId: {}".format(_terminal_text(resource_id)))
-    lines.append("| className: {}".format(_terminal_text(cls)))
-    lines.append("| position: ({}, {})".format(x, y))
 
-    status = []
+def format_status(elem: Dict[str, Any]) -> str:
+    status: List[str] = []
     if elem.get("clickable"):
         status.append("clickable")
     if elem.get("focusable"):
         status.append("focusable")
-    lines.append("| status: {}".format(", ".join(status) if status else "none"))
+    if elem.get("isInput"):
+        status.append("input")
+    return ", ".join(status) if status else "none"
+
+
+def format_detail_card(title: str, rows: List[Tuple[str, Any]]) -> str:
+    lines = []
+
+    lines.append("+" + "-" * 60 + "+")
+    lines.append("| {}".format(_terminal_text(title)))
+    lines.append("|" + "-" * 61 + "|")
+    for label, value in rows:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        lines.append("| {}: {}".format(label, _terminal_text(text)))
     lines.append("+" + "-" * 60 + "+")
     return "\n".join(lines)
+
+
+def format_element(elem: Dict[str, Any]) -> str:
+    ref_id = elem.get("refId", "?")
+    text = elem.get("text", "")
+    desc = elem.get("contentDesc", "")
+    resource_id = elem.get("resourceId", "")
+    cls = _short_class_name(elem.get("simpleClassName") or elem.get("className"))
+    bounds = elem.get("bounds", "")
+    x, y = elem.get("x", "?"), elem.get("y", "?")
+
+    rows: List[Tuple[str, Any]] = []
+    if text:
+        rows.append(("text", text[:50]))
+    if desc:
+        rows.append(("contentDesc", desc[:50]))
+    if resource_id:
+        rows.append(("resourceId", resource_id))
+    rows.extend([
+        ("className", cls),
+        ("bounds", bounds),
+        ("position", f"({x}, {y})"),
+        ("status", format_status(elem)),
+    ])
+    return format_detail_card(f"refId: {ref_id}", rows)
 
 
 def print_tree(

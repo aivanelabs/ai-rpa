@@ -364,6 +364,39 @@ class AgentAndroidClient:
             return None
         return self._parse_match_count(outputs.get("matchCount"))
 
+    def _get_xpath_runtime_summaries(self, xpath: str) -> List[Dict[str, str]]:
+        result = self._execute_template(
+            template_id="xpath-runtime-summaries",
+            output_names=["matches"],
+            operations=[
+                {
+                    "operationType": "android.element.getAll",
+                    "parameters": {
+                        "xpath": xpath,
+                        "variableName": "matches",
+                    }
+                }
+            ]
+        )
+        outputs = self._get_outputs(result)
+        raw_matches = outputs.get("matches")
+        if not isinstance(raw_matches, str) or not raw_matches.strip():
+            return []
+
+        pattern = re.compile(
+            r"AndroidElement\{id='[^']*', text='(.*?)', className='(.*?)', stale=(?:true|false)\}",
+            re.DOTALL,
+        )
+        summaries: List[Dict[str, str]] = []
+        for match in pattern.finditer(raw_matches):
+            summaries.append(
+                {
+                    "text": match.group(1),
+                    "className": match.group(2),
+                }
+            )
+        return summaries
+
     def _describe_unique_xpath_match(self, xpath: str) -> Dict[str, Any]:
         """When an XPath is unique, read a few key attributes from the first match."""
         result = self._execute_template(
@@ -1447,9 +1480,11 @@ class AgentAndroidClient:
         Strategy:
         Some intermediate nodes in accessibility xpaths may not expose @refId,
         so we cannot always derive the parent from the parent segment's @refId.
-        Instead we use a stack: traverse elements by depth order and keep the
-        most recent refId at each depth. When the next element is shallower we
-        pop; when it is deeper we push.
+        Instead we walk the flat list in its original UI order and keep a stack
+        of the currently open refIds by depth. This preserves sibling and
+        ancestor relationships from the source traversal order; sorting by depth
+        can incorrectly attach later shallow nodes as parents of unrelated deep
+        descendants.
 
         Each node contains:
         {elem, parent_ref_id, depth, xpath_prefix, children_ref_ids}
@@ -1471,15 +1506,16 @@ class AgentAndroidClient:
                 prefix = '/WindowRoot'
             elem_xpath[ref_id] = prefix
 
-        stack: List[int] = []  # refIds ordered by depth; stack[depth] = refId
+        stack: List[int] = []
         elem_parent: Dict[int, Optional[int]] = {}
 
-        indexed = [(elem_depth[rid], i, rid) for i, rid in enumerate(elem_depth)]
-        indexed.sort(key=lambda x: (x[0], x[1]))
-
-        for depth, _, ref_id in indexed:
+        for elem in tree:
+            ref_id = elem.get('refId')
+            if ref_id is None:
+                continue
+            depth = elem_depth.get(ref_id, 0)
             elem_parent[ref_id] = None
-            while len(stack) > depth:
+            while len(stack) >= depth and stack:
                 stack.pop()
             if stack:
                 elem_parent[ref_id] = stack[-1]
@@ -1574,6 +1610,26 @@ class AgentAndroidClient:
             return int(match.group(1))
         except ValueError:
             return None
+
+    def _extract_segment_class(self, segment: str) -> str:
+        stripped = segment.strip()
+        if not stripped:
+            return ''
+        return re.sub(r'\[.*$', '', stripped)
+
+    def _common_path_segments(self, paths: List[List[str]]) -> List[str]:
+        if not paths:
+            return []
+        prefix = list(paths[0])
+        for path in paths[1:]:
+            limit = min(len(prefix), len(path))
+            i = 0
+            while i < limit and prefix[i] == path[i]:
+                i += 1
+            prefix = prefix[:i]
+            if not prefix:
+                break
+        return prefix
 
     def _make_target_segment(
         self,
@@ -1713,6 +1769,178 @@ class AgentAndroidClient:
                 parent_map[id(child)] = parent
         return parent_map
 
+    def _get_ui_tree_root(self, force_refresh: bool = True, visible_only: bool = True) -> Optional[ET.Element]:
+        xml_text = self.get_ui_tree_xml(force_refresh=force_refresh, visible_only=visible_only)
+        if not xml_text:
+            return None
+        try:
+            return ET.fromstring(xml_text)
+        except ET.ParseError:
+            return None
+
+    def _format_xml_node_snippet(self, xml_node: ET.Element) -> str:
+        snippet = ET.Element("node")
+        for key, value in xml_node.attrib.items():
+            snippet.set(key, value)
+        return ET.tostring(snippet, encoding="unicode", short_empty_elements=True)
+
+    def _split_xpath_segments_runtime(self, xpath: str) -> List[str]:
+        text = xpath.strip()
+        if text.startswith("/hierarchy/"):
+            text = text[len("/hierarchy/"):]
+        elif text.startswith("/hierarchy"):
+            text = text[len("/hierarchy"):].lstrip("/")
+        elif text.startswith("/"):
+            text = text.lstrip("/")
+        if not text:
+            return []
+
+        segments: List[str] = []
+        current: List[str] = []
+        depth = 0
+        in_quote: Optional[str] = None
+        for ch in text:
+            if in_quote is not None:
+                current.append(ch)
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ("'", '"'):
+                in_quote = ch
+                current.append(ch)
+                continue
+            if ch == "[":
+                depth += 1
+                current.append(ch)
+                continue
+            if ch == "]":
+                depth = max(0, depth - 1)
+                current.append(ch)
+                continue
+            if ch == "/" and depth == 0:
+                segment = "".join(current).strip()
+                if segment:
+                    segments.append(segment)
+                current = []
+                continue
+            current.append(ch)
+        segment = "".join(current).strip()
+        if segment:
+            segments.append(segment)
+        return segments
+
+    def _xml_short_class(self, xml_node: ET.Element) -> str:
+        full_cls = xml_node.attrib.get("class", "") or ""
+        return full_cls.split(".")[-1] if "." in full_cls else full_cls
+
+    def _parse_segment_predicates(self, segment: str) -> Tuple[str, List[str]]:
+        cls = re.sub(r"\[.*$", "", segment).strip()
+        predicates = re.findall(r"\[([^\]]+)\]", segment)
+        return cls, predicates
+
+    def _match_xml_predicate(
+        self,
+        xml_node: ET.Element,
+        parent: ET.Element,
+        predicate: str,
+        class_name: str,
+    ) -> bool:
+        predicate = predicate.strip()
+        if not predicate:
+            return True
+
+        if predicate.isdigit():
+            same_class = [child for child in list(parent) if self._xml_short_class(child) == class_name]
+            try:
+                return same_class.index(xml_node) + 1 == int(predicate)
+            except ValueError:
+                return False
+
+        position_equals = re.fullmatch(r"position\(\)\s*=\s*\d+(?:\s+or\s+position\(\)\s*=\s*\d+)*", predicate)
+        if position_equals:
+            indexes = [int(value) for value in re.findall(r"position\(\)\s*=\s*(\d+)", predicate)]
+            same_class = [child for child in list(parent) if self._xml_short_class(child) == class_name]
+            try:
+                return (same_class.index(xml_node) + 1) in indexes
+            except ValueError:
+                return False
+
+        position_range = re.fullmatch(r"position\(\)\s*>=\s*(\d+)\s+and\s+position\(\)\s*<=\s*(\d+)", predicate)
+        if position_range:
+            lower = int(position_range.group(1))
+            upper = int(position_range.group(2))
+            same_class = [child for child in list(parent) if self._xml_short_class(child) == class_name]
+            try:
+                index = same_class.index(xml_node) + 1
+            except ValueError:
+                return False
+            return lower <= index <= upper
+
+        attr_equals = re.fullmatch(r"@([A-Za-z0-9:_-]+)\s*=\s*(['\"])(.*)\2", predicate)
+        if attr_equals:
+            attr_name = attr_equals.group(1)
+            attr_value = attr_equals.group(3)
+            attr_aliases = {
+                "contentDescription": "content-desc",
+                "resourceId": "resource-id",
+            }
+            normalized = attr_aliases.get(attr_name, attr_name)
+            return (xml_node.attrib.get(normalized, "") or "") == attr_value
+
+        attr_or_equals = re.fullmatch(
+            r"@([A-Za-z0-9:_-]+)\s*=\s*(['\"])(.*)\2\s+or\s+@([A-Za-z0-9:_-]+)\s*=\s*(['\"])(.*)\5",
+            predicate,
+        )
+        if attr_or_equals:
+            left_attr = attr_or_equals.group(1)
+            left_value = attr_or_equals.group(3)
+            right_attr = attr_or_equals.group(4)
+            right_value = attr_or_equals.group(6)
+            attr_aliases = {
+                "contentDescription": "content-desc",
+                "resourceId": "resource-id",
+            }
+            left_norm = attr_aliases.get(left_attr, left_attr)
+            right_norm = attr_aliases.get(right_attr, right_attr)
+            actual_left = (xml_node.attrib.get(left_norm, "") or "") == left_value
+            actual_right = (xml_node.attrib.get(right_norm, "") or "") == right_value
+            return actual_left or actual_right
+
+        return False
+
+    def _find_xml_nodes_for_runtime_xpath(self, xpath: str, root: ET.Element) -> List[ET.Element]:
+        segments = self._split_xpath_segments_runtime(xpath)
+        if not segments:
+            return []
+
+        current_nodes: List[ET.Element] = [root]
+        for segment in segments:
+            class_name, predicates = self._parse_segment_predicates(segment)
+            next_nodes: List[ET.Element] = []
+            for parent in current_nodes:
+                children = [child for child in list(parent) if child.tag == "node"]
+                for child in children:
+                    if class_name and self._xml_short_class(child) != class_name:
+                        continue
+                    if all(self._match_xml_predicate(child, parent, predicate, class_name) for predicate in predicates):
+                        next_nodes.append(child)
+            current_nodes = next_nodes
+            if not current_nodes:
+                break
+        return current_nodes
+
+    def _match_runtime_summary_to_xml_node(self, summary: Dict[str, str], xml_node: ET.Element) -> bool:
+        class_name = (summary.get("className") or "").strip()
+        runtime_text = (summary.get("text") or "").strip()
+        xml_class = (xml_node.attrib.get("class", "") or "").strip()
+        if class_name and xml_class != class_name:
+            return False
+        if runtime_text:
+            xml_text = (xml_node.attrib.get("text", "") or "").strip()
+            xml_desc = (xml_node.attrib.get("content-desc", "") or "").strip()
+            return runtime_text == xml_text or runtime_text == xml_desc
+        return True
+
     def _get_xml_node_index(self, node: ET.Element, parent: Optional[ET.Element]) -> int:
         if parent is None:
             return 1
@@ -1740,6 +1968,51 @@ class AgentAndroidClient:
         if best_score < 0 or tie:
             return None
         return best_node
+
+    def get_node_snippet_for_element(self, elem: Dict[str, Any], visible_only: bool = True) -> Optional[str]:
+        root = self._get_ui_tree_root(force_refresh=True, visible_only=visible_only)
+        if root is None:
+            return None
+        xml_node = self._find_matching_xml_node(elem, root)
+        if xml_node is None:
+            return None
+        return self._format_xml_node_snippet(xml_node)
+
+    def get_node_snippets_for_xpath(self, xpath: str, visible_only: bool = True) -> List[str]:
+        root = self._get_ui_tree_root(force_refresh=True, visible_only=visible_only)
+        if root is None:
+            return []
+        summaries = self._get_xpath_runtime_summaries(xpath)
+        if summaries:
+            snippets: List[str] = []
+            used: set[int] = set()
+            xml_nodes = list(root.iter("node"))
+            for summary in summaries:
+                for xml_node in xml_nodes:
+                    if id(xml_node) in used:
+                        continue
+                    if not self._match_runtime_summary_to_xml_node(summary, xml_node):
+                        continue
+                    used.add(id(xml_node))
+                    snippets.append(self._format_xml_node_snippet(xml_node))
+                    break
+            if snippets:
+                return snippets
+        tree = self.get_ui_elements(force_refresh=True, visible_only=visible_only)
+        if not tree:
+            return []
+        matches = self.find_by_xpath_all(tree, xpath)
+        if not matches:
+            return []
+        snippets: List[str] = []
+        seen: set[int] = set()
+        for elem in matches:
+            xml_node = self._find_matching_xml_node(elem, root)
+            if xml_node is None or id(xml_node) in seen:
+                continue
+            seen.add(id(xml_node))
+            snippets.append(self._format_xml_node_snippet(xml_node))
+        return snippets
 
     def build_ui_tree_absolute_xpath(self, tree: List[Dict], elem: Dict) -> Optional[str]:
         xml_text = self.get_ui_tree_xml(force_refresh=True)
@@ -1992,6 +2265,114 @@ class AgentAndroidClient:
             strategy_order.get(c[2], 99),  # then by strategy
             c[1]  # then by match count
         ))
+        return candidates
+
+    def generate_multi_xpath_candidates(
+        self, elems: List[Dict[str, Any]], tree: List[Dict[str, Any]]
+    ) -> List[Tuple[str, int, str]]:
+        """Generate XPath candidates that match multiple selected elements."""
+        if not elems:
+            return []
+
+        selected = [elem for elem in elems if elem.get("refId") is not None]
+        if not selected:
+            return []
+
+        absolute_paths: List[str] = []
+        path_segments: List[List[str]] = []
+        for elem in selected:
+            runtime_xpath = self.build_runtime_absolute_xpath(tree, elem)
+            if not runtime_xpath:
+                continue
+            absolute_paths.append(runtime_xpath)
+            path_segments.append([segment for segment in runtime_xpath.split("/") if segment])
+
+        if len(absolute_paths) != len(selected):
+            return []
+
+        nodes = self._build_tree_structure(tree)
+
+        candidates: List[Tuple[str, int, str]] = []
+        seen: set[str] = set()
+
+        def add(xpath: str, strategy: str) -> None:
+            if not xpath or xpath in seen:
+                return
+            seen.add(xpath)
+            count = self._get_xpath_match_count(xpath)
+            candidates.append((xpath, count if count is not None else -1, strategy))
+
+        if len(absolute_paths) > 1:
+            add(" | ".join(absolute_paths), "absolute-union")
+        else:
+            add(absolute_paths[0], "absolute-single")
+
+        parent_segments = self._common_path_segments([segments[:-1] for segments in path_segments])
+        target_segments = [segments[-1] for segments in path_segments if segments]
+        target_classes = [self._extract_segment_class(segment) for segment in target_segments]
+        target_indexes: List[Optional[int]] = []
+        for elem, segment in zip(selected, target_segments):
+            ref_id = elem.get("refId")
+            node = nodes.get(ref_id) if ref_id is not None else None
+            parent_ref_id = node.get("parent_ref_id") if node else None
+            parent_node = nodes.get(parent_ref_id) if parent_ref_id is not None else None
+            cls = self._extract_segment_class(segment)
+            if not parent_node or not cls:
+                target_indexes.append(self._extract_path_index(segment))
+                continue
+            siblings = parent_node.get("children_ref_ids", [])
+            same_class_siblings = [
+                sid for sid in siblings
+                if sid in nodes and nodes[sid]["elem"].get("simpleClassName") == cls
+            ]
+            try:
+                target_indexes.append(same_class_siblings.index(ref_id) + 1)
+            except ValueError:
+                target_indexes.append(self._extract_path_index(segment))
+
+        if parent_segments and len(set(target_classes)) == 1 and target_classes[0]:
+            parent_xpath = "/" + "/".join(parent_segments)
+            cls = target_classes[0]
+            class_xpath = f"{parent_xpath}/{cls}"
+            add(class_xpath, "same-parent class")
+
+            if all(index is not None for index in target_indexes):
+                indexes = [int(index) for index in target_indexes if index is not None]
+                position_predicate = " or ".join(f"position()={index}" for index in indexes)
+                add(f"{class_xpath}[{position_predicate}]", "same-parent positions")
+
+                ordered = sorted(indexes)
+                if ordered == list(range(ordered[0], ordered[-1] + 1)):
+                    add(
+                        f"{class_xpath}[position()>={ordered[0]} and position()<={ordered[-1]}]",
+                        "same-parent contiguous-range",
+                    )
+
+        target_count = len(selected)
+        exact_order = {
+            "same-parent positions": 0,
+            "same-parent contiguous-range": 1,
+            "same-parent class": 2,
+            "absolute-union": 3,
+            "absolute-single": 4,
+        }
+        superset_order = {
+            "same-parent class": 0,
+            "same-parent positions": 1,
+            "same-parent contiguous-range": 2,
+            "absolute-union": 3,
+            "absolute-single": 4,
+        }
+        candidates.sort(
+            key=lambda candidate: (
+                0 if candidate[1] == target_count else 1 if candidate[1] > target_count else 2 if candidate[1] >= 0 else 3,
+                exact_order.get(candidate[2], 99) if candidate[1] == target_count else
+                superset_order.get(candidate[2], 99) if candidate[1] > target_count else
+                exact_order.get(candidate[2], 99),
+                abs(candidate[1] - target_count) if candidate[1] >= 0 else 999,
+                candidate[1] if candidate[1] >= 0 else 999,
+            )
+        )
         return candidates
 
     def tap_by_xpath(self, xpath: str) -> bool:

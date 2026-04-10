@@ -9,7 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .client import AgentAndroidClient
 from .config import CONFIG_FILE_PATH, save_token_to_config, save_url_to_config
-from .formatting import _format_launcher_app, format_element, print_tree
+from .formatting import (
+    _format_launcher_app,
+    format_detail_card,
+    format_element,
+    format_status,
+    print_tree,
+)
 
 try:
     import readline
@@ -59,9 +65,12 @@ class AriaReplSession:
         ('f', 'find',          'Filter by text or content description'),
         ('id', None,           'Filter by resourceId'),
         ('ref', None,          'Show element details'),
+        ('node', None,         'Print raw UI-tree node XML for a refId'),
         ('x', 'xpath',         'Show XPath candidates and match counts'),
+        ('mx', 'multixpath',   'Find shared XPath candidates for multiple refIds'),
         ('xx', None,           'Tap via the best unique auto-generated XPath'),
         ('vx', 'validatex',    'Validate an XPath at runtime'),
+        ('vn', 'validatenodes','Print raw UI-tree node XML for XPath matches'),
         ('t', 'tap',           'Tap an element by refId'),
         ('tx', 'tapx',         'Tap an element by XPath'),
         ('i', 'input',         'Input text (refId text)'),
@@ -72,6 +81,7 @@ class AriaReplSession:
         ('wf', 'waitfor',      'Wait for an element to appear'),
         ('g', 'get',           'Read an element attribute'),
         ('s', 'screenshot',    'Capture a screenshot'),
+        ('ux', 'uitree',       'Print or save the current UI tree XML'),
         ('la', 'launch',       'Launch an app'),
         ('raw', None,          'Toggle raw JSON output'),
         ('vars', None,         'Show session variables'),
@@ -157,13 +167,13 @@ class AriaReplSession:
         if cmd in ('tx', 'tapx'):
             return cmd, [remainder] if remainder else []
 
-        if cmd in ('vx', 'validatex'):
+        if cmd in ('vx', 'validatex', 'vn', 'validatenodes'):
             xpath, extra = self._split_xpath_expression(remainder)
             if not xpath:
                 return cmd, []
-            if extra and extra.isdigit():
+            if cmd in ('vx', 'validatex') and extra and extra.isdigit():
                 return cmd, [xpath, extra]
-            if extra.startswith('(') and extra.endswith(')'):
+            if cmd in ('vx', 'validatex') and extra.startswith('(') and extra.endswith(')'):
                 return cmd, [xpath]
             return cmd, [xpath] if xpath else []
 
@@ -461,6 +471,26 @@ class AriaReplSession:
         print(format_element(elem))
         return True
 
+    def _cmd_node(self, args: List[str]) -> bool:
+        """node <refId> - print the raw UI-tree node XML for a refId."""
+        if not args or not args[0].isdigit():
+            self._print_error("Usage: node <refId>")
+            return False
+        refId = int(args[0])
+        tree = self._ensure_tree()
+        if not tree:
+            return False
+        elem = self.client.find_by_refId(tree, refId)
+        if not elem:
+            print(f"  [!] Element refId={refId} not found ({len(tree)} elements in tree)")
+            return False
+        snippet = self.client.get_node_snippet_for_element(elem)
+        if not snippet:
+            print(f"  [!] Could not resolve a UI-tree node snippet for refId={refId}")
+            return False
+        print(snippet)
+        return True
+
     def _cmd_xpath(self, args: List[str]) -> bool:
         """x <N> - show XPath candidates validated by Android runtime match counts."""
         if len(args) != 1 or not args[0].isdigit():
@@ -483,11 +513,14 @@ class AriaReplSession:
         ui_tree_absolute = self.client.build_ui_tree_absolute_xpath(tree, elem)
         runtime_absolute = self.client.build_runtime_absolute_xpath(tree, elem)
         runtime_absolute_info = self.client.validate_xpath_runtime(runtime_absolute) if runtime_absolute else None
+        visible_candidates = [candidate for candidate in candidates if candidate[1] != 0]
+        if not visible_candidates:
+            visible_candidates = candidates
 
         print()
         print(f"  refId={refId}  text='{elem.get('text', '')[:30]}'  "
               f"class={elem.get('simpleClassName', '')}")
-        if ui_tree_absolute:
+        if ui_tree_absolute and ui_tree_absolute != runtime_absolute:
             print(f"  UI tree absolute path: {ui_tree_absolute}")
         if runtime_absolute:
             runtime_count = runtime_absolute_info.get('count') if runtime_absolute_info else '?'
@@ -496,7 +529,7 @@ class AriaReplSession:
         print(f"  {'Idx':<4} {'Runtime':<10} {'XPath'}")
         print(f"  {'-' * 60}")
 
-        for i, (xp, count, strategy, info) in enumerate(candidates):
+        for i, (xp, count, strategy, info) in enumerate(visible_candidates):
             badge = ''
             if count < 0:
                 badge = ' ? error'
@@ -513,7 +546,7 @@ class AriaReplSession:
                 print(f"      -> {info.get('className') or '-'} | {summary!r}")
 
         print(f"  {'-' * 60}")
-        best = candidates[0]
+        best = visible_candidates[0]
         if best[1] == 1:
             print(f"  Recommended: {best[0]}")
             print(f"    strategy={best[2]}, runtime matched exactly 1 element")
@@ -535,6 +568,121 @@ class AriaReplSession:
 
     def _cmd_x(self, args: List[str]) -> bool:
         return self._cmd_xpath(args)
+
+    def _parse_refid_list(self, args: List[str]) -> List[int]:
+        ref_ids: List[int] = []
+        for arg in args:
+            for part in arg.split(","):
+                value = part.strip()
+                if not value:
+                    continue
+                if not value.isdigit():
+                    raise ValueError(value)
+                ref_ids.append(int(value))
+        deduped: List[int] = []
+        seen: set[int] = set()
+        for ref_id in ref_ids:
+            if ref_id in seen:
+                continue
+            seen.add(ref_id)
+            deduped.append(ref_id)
+        return deduped
+
+    def _cmd_multixpath(self, args: List[str]) -> bool:
+        """mx <id1,id2,...> - find shared XPath candidates for multiple refIds."""
+        if not args:
+            self._print_error("Usage: mx <refId[,refId...] ...>")
+            return False
+        try:
+            ref_ids = self._parse_refid_list(args)
+        except ValueError:
+            self._print_error("Usage: mx <refId[,refId...] ...>")
+            return False
+        if len(ref_ids) < 2:
+            self._print_error("Usage: mx <refId[,refId...] ...>")
+            self._print_error("  Provide at least two refIds, for example: mx 13,14")
+            return False
+
+        tree = self._ensure_tree()
+        if not tree:
+            return False
+
+        elems: List[Dict[str, Any]] = []
+        for ref_id in ref_ids:
+            elem = self.client.find_by_refId(tree, ref_id)
+            if not elem:
+                print(f"  [!] Element refId={ref_id} not found")
+                return False
+            elems.append(elem)
+
+        candidates = self.client.generate_multi_xpath_candidates(elems, tree)
+        if not candidates:
+            print("  [!] No shared XPath candidates generated")
+            return False
+
+        target_count = len(elems)
+        exact_candidates = [candidate for candidate in candidates if candidate[1] == target_count]
+        superset_candidates = [candidate for candidate in candidates if candidate[1] > target_count]
+        partial_candidates = [candidate for candidate in candidates if 0 <= candidate[1] < target_count]
+        error_candidates = [candidate for candidate in candidates if candidate[1] < 0]
+        visible_candidates = exact_candidates + superset_candidates
+        if not visible_candidates:
+            visible_candidates = partial_candidates + error_candidates
+
+        print()
+        print(f"  refIds={','.join(str(ref_id) for ref_id in ref_ids)}  targetCount={target_count}")
+        print(f"  {'-' * 60}")
+        print(f"  {'Idx':<4} {'Runtime':<10} {'Strategy'}")
+        print(f"  {'-' * 60}")
+
+        for index, (xpath, count, strategy) in enumerate(visible_candidates):
+            if count < 0:
+                badge = " ? error"
+                summary = "runtime validation failed"
+            elif count == target_count:
+                badge = f" OK exact"
+                summary = f"exact match ({count})"
+            elif count > target_count:
+                badge = f" X {count} matches"
+                if strategy in ("same-parent positions", "same-parent contiguous-range"):
+                    summary = f"superset ({count}, runtime ignored predicate)"
+                else:
+                    summary = f"superset ({count})"
+            else:
+                badge = f" ! {count} matches"
+                summary = f"partial ({count})"
+            print(f"  [{index}] {badge:<10} {strategy}")
+            print(f"      -> {summary}")
+            print(f"      XPath: {xpath}")
+
+        if partial_candidates:
+            print(f"  {'-' * 60}")
+            print("  Skipped partial candidates:")
+            for xpath, count, strategy in partial_candidates:
+                print(f"      {strategy}: matched {count}")
+
+        print(f"  {'-' * 60}")
+        best = visible_candidates[0]
+        if best[1] == target_count:
+            print(f"  Recommended exact: {best[0]}")
+            print(f"    strategy={best[2]}, runtime matched exactly {target_count} elements")
+        elif best[1] > target_count:
+            if not exact_candidates:
+                print("  Note: no exact multi-match XPath appears to be supported by the current runtime.")
+            print(f"  Recommended superset: {best[0]}")
+            print(f"    strategy={best[2]}, runtime matched {best[1]} elements")
+        else:
+            print(f"  Warning: best candidate is incomplete or failed validation")
+            print(f"     recommended: {best[0]}")
+
+        self.variables["LAST_MULTI_REFIDS"] = ref_ids
+        self.variables["LAST_MULTI_XPATH"] = best[0]
+        self.variables["LAST_MULTI_XPATH_COUNT"] = best[1]
+        self.variables["LAST_MULTI_XPATH_STRATEGY"] = best[2]
+        return True
+
+    def _cmd_mx(self, args: List[str]) -> bool:
+        return self._cmd_multixpath(args)
 
     def _cmd_xx(self, args: List[str]) -> bool:
         """xx <N> - tap via an auto-generated unique XPath when possible."""
@@ -602,8 +750,7 @@ class AriaReplSession:
             print(f"  [!] Runtime validation failed: {xpath}")
             return False
 
-        print(f"  XPath: {xpath}")
-        print(f"  Runtime match count: {info.get('count')}")
+        count = info.get("count")
         if detail_index is None and info.get('count') == 1:
             detail_index = 0
         if detail_index is not None:
@@ -611,19 +758,77 @@ class AriaReplSession:
             if not detail:
                 print(f"  [!] Match index {detail_index} is out of range")
                 return False
-            print(f"  Match[{detail_index}] refId: {detail.get('refId') if detail.get('refId') is not None else '-'}")
-            print(f"  Class:  {detail.get('className') or '-'}")
-            print(f"  Text:   {detail.get('text') or '-'}")
-            print(f"  Desc:   {detail.get('contentDescription') or '-'}")
-            print(f"  Bounds: {detail.get('bounds') or '-'}")
-            print(f"  Center: ({detail.get('x')}, {detail.get('y')})")
-            print(f"  Input:  {'yes' if detail.get('isInput') else 'no'}")
+            desc = detail.get("contentDescription") or "-"
+            vx_elem = {
+                "text": detail.get("text") or "-",
+                "className": detail.get("className") or "-",
+                "bounds": detail.get("bounds") or "-",
+                "x": detail.get("x"),
+                "y": detail.get("y"),
+                "clickable": detail.get("clickable"),
+                "focusable": detail.get("focusable"),
+                "isInput": detail.get("isInput"),
+            }
+            print(
+                format_detail_card(
+                    f"XPath: {xpath}",
+                    [
+                        ("matches", count),
+                        ("text", vx_elem["text"]),
+                        ("className", str(vx_elem["className"]).rsplit(".", 1)[-1]),
+                        ("bounds", vx_elem["bounds"]),
+                        ("position", f"({vx_elem.get('x')}, {vx_elem.get('y')})"),
+                        ("status", format_status(vx_elem)),
+                    ],
+                )
+            )
         elif info.get('count', 0) > 1:
+            print(f"  XPath: {xpath}")
+            print(f"  Runtime match count: {count}")
             print("  Tip: append an index to inspect one match, for example: vx <xpath> 0")
+            print("  Tip: use 'vn <xpath>' to print the matched <node .../> snippets")
+        elif info.get('count', 0) == 0:
+            print(f"  XPath: {xpath}")
+            print("  Runtime match count: 0")
+            print("  No elements matched.")
+        else:
+            print(
+                format_detail_card(
+                    f"XPath: {xpath}",
+                    [
+                        ("matches", count),
+                        ("text", info.get("text") or "-"),
+                        ("className", str(info.get("className") or "-").rsplit(".", 1)[-1]),
+                        ("bounds", info.get("bounds") or "-"),
+                        ("position", "(None, None)"),
+                        ("status", "none"),
+                    ],
+                )
+            )
         return True
 
     def _cmd_vx(self, args: List[str]) -> bool:
         return self._cmd_validatex(args)
+
+    def _cmd_validatenodes(self, args: List[str]) -> bool:
+        """vn <xpath> - print raw UI-tree node XML snippets for XPath matches."""
+        if not args:
+            self._print_error("Usage: vn <xpath>")
+            return False
+        xpath = args[0]
+        snippets = self.client.get_node_snippets_for_xpath(xpath)
+        if not snippets:
+            print(f"  XPath: {xpath}")
+            print("  No matched node snippets.")
+            return True
+        print(f"  XPath: {xpath}")
+        print(f"  Matched node snippets: {len(snippets)}")
+        for snippet in snippets:
+            print(f"  {snippet}")
+        return True
+
+    def _cmd_vn(self, args: List[str]) -> bool:
+        return self._cmd_validatenodes(args)
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -811,6 +1016,44 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
 
+    def _cmd_uitree(self, args: List[str]) -> bool:
+        """ux [path] [--all] - print or save the current UI tree XML."""
+        output_path: Optional[str] = None
+        visible_only = True
+        for arg in args:
+            if arg == "--all":
+                visible_only = False
+            elif output_path is None:
+                output_path = arg
+            else:
+                self._print_error("Usage: ux [path] [--all]")
+                return False
+
+        xml_text = self.client.get_ui_tree_xml(force_refresh=True, visible_only=visible_only)
+        if not xml_text:
+            self._print_error("Failed to fetch UI tree XML")
+            return False
+
+        if output_path:
+            destination = os.path.expanduser(output_path)
+            try:
+                with open(destination, "w", encoding="utf-8") as handle:
+                    handle.write(xml_text)
+            except OSError as exc:
+                self._print_error(f"Failed to save UI tree XML: {exc}")
+                return False
+            print(f"  ✓ UI tree XML saved to {destination}")
+            return True
+
+        print(xml_text)
+        return True
+
+    def _cmd_ux(self, args: List[str]) -> bool:
+        return self._cmd_uitree(args)
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
     def _cmd_launch(self, args: List[str]) -> bool:
         """la <package> - launch an app."""
         if not args:
@@ -940,10 +1183,15 @@ class AriaReplSession:
             "    f <text>          Filter elements by text or content description",
             "    id <resourceId>   Filter by resourceId",
             "    ref <refId>       Show detailed information for refId",
+            "    node <refId>      Print the raw <node .../> XML snippet for a refId",
             "    x <refId>         Show XPath candidates for refId (validated by runtime match count)",
+            "    mx <ids>          Find shared XPath candidates for multiple refIds",
+            "                       Example: mx 13,14",
+            "                       Example: mx 13,14,15",
             "    xx <refId>        Tap via a unique XPath candidate automatically (refuses non-unique candidates)",
             "    vx <xpath> [idx]  Validate the runtime match count for an XPath",
             "                       Use 'vx <xpath> <idx>' to inspect one runtime match in detail",
+            "    vn <xpath>        Print the raw <node .../> XML snippets for XPath matches",
             "",
             "  Interact",
             "    t <refId>         Tap the element with refId using its center point",
@@ -967,6 +1215,8 @@ class AriaReplSession:
             "    g <refId> <attr> Read an attribute from refId",
             "                       (text/class/bounds/x/y/xpath/selector/...)",
             "    s [path]          Capture a screenshot (no argument = auto filename)",
+            "    ux [path] [--all] Print the current UI tree XML or save it to a file",
+            "                       Use --all to include off-screen nodes in the XML dump",
             "    la <package>      Launch an app (for example com.xingin.xhs)",
             "",
             "  Session",
@@ -983,8 +1233,9 @@ class AriaReplSession:
             "",
             "  Shortcuts: l->list, ss->snapshot, t->tap, tx->tapx, xx->tapx-auto,",
             "              i->input, ix->inputx, sw->swipe, p->press, b->back,",
-            "              wf->waitfor, g->get, s->screenshot, la->launch, hl->health, vx->validatex,",
-            "              ref->ref, x->xpath, f->find, h->help, q->quit",
+            "              wf->waitfor, g->get, s->screenshot, ux->uitree, la->launch, hl->health, vx->validatex,",
+            "              mx->multixpath,",
+            "              ref->ref, node->node, x->xpath, vn->validatenodes, f->find, h->help, q->quit",
             "",
             "  Troubleshooting",
             "    1. health",
