@@ -9,7 +9,9 @@ Use this skill to drive an Android device through the public `agent-android` bet
 
 Prerequisites:
 
-- install the CLI first: `python -m pip install aivane-agent-android`
+- install the CLI first:
+  - Windows: `py -m pip install --user aivane-agent-android`
+  - Linux / macOS: `python3 -m pip install --user aivane-agent-android`
 - make sure `agent-android` is available on `PATH`
 - install the skill from GitHub with:
   `npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y`
@@ -210,7 +212,9 @@ ix //EditText[@text='Search'] -- hello world
 ## Troubleshooting
 
 - If a Python call fails, first check whether the AIVane app or phone-side API service has exited.
-- If `agent-android` is not found, install or upgrade the CLI first: `python -m pip install --upgrade aivane-agent-android`
+- If `agent-android` is not found, install or upgrade the CLI first:
+  - Windows: `py -m pip install --user --upgrade aivane-agent-android`
+  - Linux / macOS: `python3 -m pip install --user --upgrade aivane-agent-android`
 - Re-open the app or restart the phone-side service, then retry `curl http://<device-ip>:8080/health`.
 - If `health` works but UI commands fail, run `ss` to force-refresh the tree before tapping or inputting.
 - If `tx` or `ix` fails, run `vx <xpath>` and make sure the XPath resolves to exactly one runtime match.
