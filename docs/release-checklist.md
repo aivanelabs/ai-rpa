@@ -16,7 +16,7 @@ Use this checklist before publishing a tagged PyPI release for the `agent-androi
 1. Confirm README install instructions still use `agent-android`.
 2. Confirm `skills/agent-android/SKILL.md` does not depend on relative local script paths.
 3. Confirm the GitHub skill install command is still:
-   - `npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y`
+   - `npx skills add aivanelabs/ai-rpa --skill agent-android`
 
 ## GitHub Actions
 

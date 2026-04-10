@@ -47,7 +47,7 @@ agent-android --repl --url http://<device-ip>:8080
 ## 从 GitHub 安装 Skill
 
 ```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+npx skills add aivanelabs/ai-rpa --skill agent-android
 ```
 
 这个 skill 依赖本机已经能直接运行 `agent-android`。

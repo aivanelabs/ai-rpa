@@ -94,7 +94,7 @@ This repository ships public skill references under [`skills/`](../skills/), esp
 - Install the skill with:
 
 ```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+npx skills add aivanelabs/ai-rpa --skill agent-android
 ```
 
 - Confirm the CLI smoke flow works before relying on the skill in a larger automation loop.

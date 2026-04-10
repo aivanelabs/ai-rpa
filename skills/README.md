@@ -27,7 +27,7 @@ Keep them aligned with the checked-in protocol, CLI, and docs in this repository
 - Install the skill from GitHub:
 
 ```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+npx skills add aivanelabs/ai-rpa --skill agent-android
 ```
 
 - Start by validating the phone connection with the CLI.

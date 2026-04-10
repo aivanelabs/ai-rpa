@@ -51,7 +51,7 @@ agent-android --repl --url http://<device-ip>:8080
 Use the checked-in skill directly from this repository:
 
 ```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -a openclaw -g -y
+npx skills add aivanelabs/ai-rpa --skill agent-android
 ```
 
 The skill assumes the `agent-android` CLI is already installed and available on `PATH`.
