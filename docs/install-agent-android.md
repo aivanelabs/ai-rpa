@@ -68,8 +68,16 @@ If you are not using ADB, do this manually on the phone before moving on:
 Install the desktop CLI first:
 
 ```bash
-python -m pip install aivane-agent-android
+uv tool install aivane-agent-android
 ```
+
+If `agent-android` is not found afterwards, run:
+
+```bash
+uv tool update-shell
+```
+
+Then reopen the terminal and retry.
 
 1. Open the REPL client:  
    `agent-android --repl --url http://<device-ip>:8080`
@@ -82,7 +90,7 @@ This smoke ensures the base APIs and CLI actions function before automating larg
 
 This repository ships public skill references under [`skills/`](../skills/), especially [`skills/agent-android/SKILL.md`](../skills/agent-android/SKILL.md).
 
-- Install the CLI first: `python -m pip install aivane-agent-android`
+- Install the CLI first: `uv tool install aivane-agent-android`
 - Install the skill with:
 
 ```bash

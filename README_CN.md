@@ -13,51 +13,29 @@
 
 ## 从 PyPI 安装 CLI
 
-默认包名是：
+先按官方文档安装 `uv`：
 
-Windows：
+- https://docs.astral.sh/uv/getting-started/installation/
 
-```powershell
-py -m pip install --user aivane-agent-android
-```
-
-Linux / macOS：
+然后安装 CLI：
 
 ```bash
-python3 -m pip install --user aivane-agent-android
+uv tool install aivane-agent-android
 ```
 
 升级命令：
 
-Windows：
-
-```powershell
-py -m pip install --user --upgrade aivane-agent-android
+```bash
+uv tool install --upgrade aivane-agent-android
 ```
 
-Linux / macOS：
+如果安装后找不到 `agent-android`，先运行：
 
 ```bash
-python3 -m pip install --user --upgrade aivane-agent-android
+uv tool update-shell
 ```
 
-如果 Linux / macOS 上没有 `pip`，请先为 Python 3 安装 `pip`，再重试上面的命令。
-
-如果你在 Windows 上安装后找不到 `agent-android`，先运行：
-
-```powershell
-py -m site --user-base
-```
-
-然后检查输出目录下的 `Scripts` 子目录是否已加入 `PATH`，必要时加入后重新打开终端再试。
-
-如果你在 Linux / macOS 上安装后找不到 `agent-android`，先运行：
-
-```bash
-python3 -m site --user-base
-```
-
-然后检查对应的用户脚本目录是否已经加入 `PATH`。常见情况是 `~/.local/bin`。
+然后重新打开终端再试。
 
 安装后直接使用：
 
@@ -73,23 +51,6 @@ npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -
 ```
 
 这个 skill 依赖本机已经能直接运行 `agent-android`。
-
-## 本地可编辑开发
-
-在 [`clients/python`](clients/python) 目录下执行：
-
-```bash
-cd clients/python
-python3 -m pip install -e .
-```
-
-本地构建发行包：
-
-```bash
-cd clients/python
-python3 -m pip install --upgrade build
-python3 -m build
-```
 
 ## 快速开始
 

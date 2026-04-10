@@ -15,51 +15,29 @@ The current public surface is **AIVane Android REPL Beta**: a local-first Androi
 
 ## Install The CLI From PyPI
 
-The default package name is:
+First install `uv` from the official guide:
 
-Windows:
+- https://docs.astral.sh/uv/getting-started/installation/
 
-```powershell
-py -m pip install --user aivane-agent-android
-```
-
-Linux / macOS:
+Then install the CLI:
 
 ```bash
-python3 -m pip install --user aivane-agent-android
+uv tool install aivane-agent-android
 ```
 
 Upgrade it with:
 
-Windows:
-
-```powershell
-py -m pip install --user --upgrade aivane-agent-android
+```bash
+uv tool install --upgrade aivane-agent-android
 ```
 
-Linux / macOS:
+If `agent-android` is not found after install, run:
 
 ```bash
-python3 -m pip install --user --upgrade aivane-agent-android
+uv tool update-shell
 ```
 
-If `pip` is missing on Linux / macOS, install it for Python 3 first, then retry the command above.
-
-On Windows, if `agent-android` is not found after a user install, run:
-
-```powershell
-py -m site --user-base
-```
-
-Then check the `Scripts` subdirectory under that location, add it to `PATH` if needed, and reopen the terminal before retrying.
-
-On Linux / macOS, if `agent-android` is not found after a user install, run:
-
-```bash
-python3 -m site --user-base
-```
-
-Then check whether the corresponding user scripts directory is on `PATH`. A common example is `~/.local/bin`.
+Then reopen the terminal and retry the command.
 
 After install, the command is:
 
@@ -77,23 +55,6 @@ npx skills add aivanelabs/ai-rpa --skill agent-android -a claude-code -a codex -
 ```
 
 The skill assumes the `agent-android` CLI is already installed and available on `PATH`.
-
-## Local Editable Development
-
-For local development, work inside [`clients/python`](clients/python):
-
-```bash
-cd clients/python
-python3 -m pip install -e .
-```
-
-Build distributions locally with:
-
-```bash
-cd clients/python
-python3 -m pip install --upgrade build
-python3 -m build
-```
 
 ## Quick Start
 

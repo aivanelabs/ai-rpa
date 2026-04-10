@@ -34,14 +34,9 @@ If `/health` does not respond yet, go to [install-agent-android.md](install-agen
 
 Use these checkpoints to avoid guessing:
 
-1. `python -m pip install aivane-agent-android`
-   Install the CLI with the command that matches your platform:
-   - Windows: `py -m pip install --user aivane-agent-android`
-   - Linux / macOS: `python3 -m pip install --user aivane-agent-android`
-   If Linux / macOS reports `No module named pip`, install `pip` for Python 3 first.
-   If the command is not found afterwards:
-   - Windows: run `py -m site --user-base` and check the `Scripts` subdirectory
-   - Linux / macOS: run `python3 -m site --user-base` and check the user scripts directory, often `~/.local/bin`
+1. Install `uv` first from the official guide: `https://docs.astral.sh/uv/getting-started/installation/`
+   Then run `uv tool install aivane-agent-android`.
+   If `agent-android` is not found afterwards, run `uv tool update-shell`, reopen the terminal, and retry.
 2. `curl http://<device-ip>:8080/health`
    Success should be JSON, not a timeout or connection-refused error. The payload should include basic service status and a `permissions` object.
 3. `agent-android --health --url http://<device-ip>:8080`

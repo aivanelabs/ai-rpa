@@ -2,27 +2,6 @@
 
 This directory contains the publishable Python CLI package for the AIVane Android REPL beta.
 
-## Install
-
-Run these commands from `clients/python/`:
-
-```bash
-python -m pip install .
-```
-
-For editable development:
-
-```bash
-python -m pip install -e .
-```
-
-To build distributions locally:
-
-```bash
-python -m pip install --upgrade build
-python -m build
-```
-
 ## Run
 
 After installation, use the console script:

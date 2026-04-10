@@ -22,7 +22,8 @@ Keep them aligned with the checked-in protocol, CLI, and docs in this repository
 
 ## How To Use Them Today
 
-- Install the CLI first: `python -m pip install aivane-agent-android`
+- Install the CLI first: `uv tool install aivane-agent-android`
+- If the command is not found afterwards, run: `uv tool update-shell`
 - Install the skill from GitHub:
 
 ```bash
