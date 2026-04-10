@@ -2,9 +2,110 @@ See the Chinese overview at [README_CN.md](README_CN.md).
 
 # AIVane AI RPA
 
-This repository is the public home for `aivanelabs/ai-rpa`.
+Control an Android phone from your desktop or AI agent in minutes: inspect UI, tap, type, launch apps, and capture screenshots locally over LAN.
 
-The current public surface is **AIVane Android REPL Beta**: a local-first Android automation CLI, public docs, examples, and an installable `agent-android` skill for agent tools such as Codex, Claude Code, and OpenClaw.
+This repository is the public home for `aivanelabs/ai-rpa`. The current public surface is **AIVane Android REPL Beta**: an installable CLI plus an installable `agent-android` skill for tools such as Codex, Claude Code, and OpenClaw.
+
+## Start Here
+
+- Download APK: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
+- Install CLI: `uv tool install aivane-agent-android`
+- Install skill: `npx skills add aivanelabs/ai-rpa --skill agent-android`
+
+## 3-Step Quickstart
+
+1. Install the APK on your phone and enable the AIVane accessibility service.
+2. Install the CLI:
+
+```bash
+uv tool install aivane-agent-android
+```
+
+If `agent-android` is not found afterwards, run:
+
+```bash
+uv tool update-shell
+```
+
+Then reopen the terminal. If you want the current shell to work immediately on Linux, run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+3. Verify the device is reachable:
+
+```bash
+agent-android --health --url http://<device-ip>:8080
+```
+
+If that succeeds, start the REPL:
+
+```bash
+agent-android --repl --url http://<device-ip>:8080
+```
+
+## Choose A Path
+
+### For Humans
+
+Use the CLI directly when you want to manually explore the phone from your desktop:
+
+1. Download the APK from [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
+2. Install the CLI with `uv tool install aivane-agent-android`
+3. Run `agent-android --repl --url http://<device-ip>:8080`
+4. In the REPL, use the short loop: `health` -> `apps` -> `la <package>` -> `list` -> one action -> `list`
+
+### For AI Agents
+
+Use the skill when you want Codex, Claude Code, or another coding agent to drive the phone:
+
+1. Install the CLI with `uv tool install aivane-agent-android`
+2. Install the skill:
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android
+```
+
+3. Give the agent a concrete task, for example:
+
+```text
+Use the installed agent-android skill to:
+1. check phone health
+2. list launcher apps
+3. launch Settings
+4. inspect visible UI nodes
+5. tap the Wi-Fi entry
+```
+
+## First Success Path
+
+This is the shortest practical smoke flow after the phone is reachable:
+
+1. `agent-android --repl --url http://<device-ip>:8080`
+2. `set url http://<device-ip>:8080`
+3. `health`
+4. `apps`
+5. `la <package>`
+6. `list`
+7. `tap <refId>`
+8. `list`
+
+If you want the full setup path, see [docs/install-agent-android.md](docs/install-agent-android.md) and [docs/quickstart.md](docs/quickstart.md).
+
+## What This Beta Is
+
+- Local-first Android automation over LAN
+- Human-friendly REPL plus agent-friendly skill
+- Public CLI command: `agent-android`
+- Designed for inspect -> act -> inspect workflows
+
+## What This Beta Is Not
+
+- Not a cloud phone farm
+- Not remote control over arbitrary networks by default
+- Not iOS support
+- Not a visual recorder workflow yet
 
 ## Why The Phone Is The Web Server
 
@@ -12,77 +113,6 @@ The current public surface is **AIVane Android REPL Beta**: a local-first Androi
 - UI inspection, taps, text input, and screenshots stay between the phone and the controlling machine.
 - The first smoke flow works without a cloud relay.
 - The tradeoff is that this beta is LAN-only.
-
-## Install The CLI From PyPI
-
-First install `uv` from the official guide:
-
-- https://docs.astral.sh/uv/getting-started/installation/
-
-Then install the CLI:
-
-```bash
-uv tool install aivane-agent-android
-```
-
-Upgrade it with:
-
-```bash
-uv tool install --upgrade aivane-agent-android
-```
-
-If `agent-android` is not found after install, run:
-
-```bash
-uv tool update-shell
-```
-
-Then reopen the terminal and retry the command.
-
-After install, the command is:
-
-```bash
-agent-android --help
-agent-android --repl --url http://<device-ip>:8080
-```
-
-## Install The Skill From GitHub
-
-Use the checked-in skill directly from this repository:
-
-```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android
-```
-
-The skill assumes the `agent-android` CLI is already installed and available on `PATH`.
-
-## Quick Start
-
-1. Install the AIVane Android REPL beta APK on your phone.
-2. Enable the AIVane accessibility service on the phone.
-3. Keep the phone and computer on the same Wi-Fi network.
-4. Confirm the phone-side service is reachable:
-   - run `curl http://<device-ip>:8080/health`
-   - expect JSON instead of a connection error
-5. Start the REPL:
-
-```bash
-agent-android --repl --url http://<device-ip>:8080
-```
-
-6. Inside the REPL, save the URL and run the first smoke flow:
-   - `set url http://<device-ip>:8080`
-   - `health`
-   - `apps`
-   - `la <package>`
-   - `list`
-   - `tap <refId>`
-   - `input <refId> "hello"`
-   - `back`
-   - `press home`
-   - `screenshot`
-
-If you want an ADB-assisted setup path, see [docs/install-agent-android.md](docs/install-agent-android.md).
 
 ## Install Sources
 
