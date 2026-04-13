@@ -17,7 +17,7 @@ This directory holds public skills for the `aivanelabs/ai-rpa` GitHub beta.
 
 ## Scope
 
-These skills are thin wrappers around the AIVane public protocol and Python client.
+These skills are thin wrappers around the AIVane public protocol and the installed `agent-android` CLI.
 Keep them aligned with the checked-in protocol, CLI, and docs in this repository.
 
 ## How To Use Them Today

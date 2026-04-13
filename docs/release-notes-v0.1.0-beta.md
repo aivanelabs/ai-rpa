@@ -7,7 +7,7 @@
 
 ## Highlights
 
-- Exposed the Python REPL client as the installable `agent-android` CLI that talks to `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, and `/download`.
+- Exposed the REPL client as the installable `agent-android` CLI that talks to `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, and `/download`.
 - Added launcher-app discovery, tap/input/swipe/back/home/stop operations, and a small smoke flow documentation.
 - Published the public permission notes, known limitations, and release checklist for `aivanelabs/ai-rpa`.
 

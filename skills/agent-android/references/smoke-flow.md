@@ -7,7 +7,7 @@ Use this checklist when validating a fresh setup.
 - Android REPL app installed
 - API service running
 - controlling machine on the same LAN
-- Python client available
+- `agent-android` available on `PATH`
 
 ## Checklist
 

@@ -6,7 +6,7 @@ We welcome feedback on the public `aivanelabs/ai-rpa` Android REPL materials.
 
 - Open an issue or discussion on `https://github.com/aivanelabs/ai-rpa`.
 - Include device info and CLI command snippets when reporting behavior.
-- Mention whether the feedback concerns docs, the Python client, or sample skills.
+- Mention whether the feedback concerns docs, the `agent-android` CLI, or sample skills.
 
 ## Quick questions we’re asking
 

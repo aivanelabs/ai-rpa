@@ -26,7 +26,7 @@ The public path is local-first:
 - UI reads, taps, inputs, and screenshots stay on the phone and controlling machine
 - the current tradeoff is LAN-only control; an optional server-side or relay path may arrive later
 
-If a Python command suddenly stops working, first check whether the AIVane app or its local API service has exited on the phone.
+If an `agent-android` command suddenly stops working, first check whether the AIVane app or its local API service has exited on the phone.
 
 ## Core Workflow
 
@@ -214,7 +214,7 @@ ix //EditText[@text='Search'] -- hello world
 
 ## Troubleshooting
 
-- If a Python call fails, first check whether the AIVane app or phone-side API service has exited.
+- If an `agent-android` command fails, first check whether the AIVane app or phone-side API service has exited.
 - If `agent-android` is not found, run `uv tool update-shell`, reopen the terminal, and retry.
 - Re-open the app or restart the phone-side service, then retry `curl http://<device-ip>:8080/health`.
 - If `health` works but UI commands fail, run `ss` to force-refresh the tree before tapping or inputting.

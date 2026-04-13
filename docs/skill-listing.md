@@ -31,7 +31,7 @@ Use AIVane to connect to an Android device, list launcher apps, inspect the curr
 
 - Accessibility must be enabled manually
 - Screenshot requires explicit authorization on device
-- Python connectivity depends on the phone-side app/service still running
+- `agent-android` connectivity depends on the phone-side app/service still running
 - The current release is aimed at exploration and testing, not fully unattended production use
 
 ## Call To Action

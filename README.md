@@ -4,10 +4,11 @@ See the Chinese overview at [README_CN.md](README_CN.md).
 
 Control an Android phone from your desktop or AI agent in minutes: inspect UI, tap, type, launch apps, and capture screenshots locally over LAN.
 
-This repository is the public home for `aivanelabs/ai-rpa`. The current public surface is **AIVane Android REPL Beta**: an installable CLI plus an installable `agent-android` skill for tools such as Codex, Claude Code, and OpenClaw.
+This repository is the public home for `aivanelabs/ai-rpa`. The current public surface is **AIVane Android REPL Beta**: a directly installable `agent-android` CLI plus a GitHub-installable `agent-android` skill for tools such as Codex, Claude Code, and OpenClaw.
 
 ## Start Here
 
+- The beta already has a ready-to-install CLI and skill path; use the commands below instead of repo-local script paths.
 - Download APK: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 - Install CLI: `uv tool install aivane-agent-android`
 - Install skill: `npx skills add aivanelabs/ai-rpa --skill agent-android`
