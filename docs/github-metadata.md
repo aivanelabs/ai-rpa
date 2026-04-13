@@ -8,7 +8,7 @@ Planned repository:
 
 ## Suggested Description
 
-AI mobile automation starter repo for AIVane. Public Android REPL beta, Python client, skills, examples, and protocol docs for AI agents.
+AI mobile automation starter repo for AIVane. Public Android REPL beta, installable `agent-android` CLI, skills, examples, and protocol docs for AI agents.
 
 ## Suggested Topics
 
@@ -30,6 +30,6 @@ AI mobile automation starter repo for AIVane. Public Android REPL beta, Python c
 ## Suggested Pinned Highlights
 
 - Android REPL beta
-- Public Python client
+- Public installable `agent-android` CLI
 - Skills and examples
 - Smoke flow

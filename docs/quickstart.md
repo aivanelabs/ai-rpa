@@ -185,7 +185,7 @@ Expected checkpoints:
 
 ## Troubleshooting
 
-- If a Python command cannot connect, first check whether the AIVane app or its local API service has exited on the phone.
+- If an `agent-android` command cannot connect, first check whether the AIVane app or its local API service has exited on the phone.
 - Re-open the app or restart the phone-side service, then retry `curl http://<device-ip>:8080/health`.
 - Confirm the phone and desktop are still on the same LAN and that `--url` points to the current device IP and port.
 

@@ -99,7 +99,7 @@ npx skills add aivanelabs/ai-rpa --skill agent-android
 
 - Confirm the CLI smoke flow works before relying on the skill in a larger automation loop.
 
-## If Python calls stop working
+## If `agent-android` commands stop working
 
 - Check whether the AIVane app has exited or the local API service on the phone is no longer running.
 - Retry the health check first: `curl http://<device-ip>:8080/health`

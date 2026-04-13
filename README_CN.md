@@ -2,10 +2,11 @@
 
 几分钟内让桌面端或 AI agent 控制 Android 手机：查看 UI、点击、输入、启动应用、截图，全部通过局域网本地完成。
 
-这是 `aivanelabs/ai-rpa` 的公开仓库。当前公开面是 **AIVane Android REPL Beta**：一个可安装的 CLI，加上一个可安装的 `agent-android` skill，面向 Codex、Claude Code、OpenClaw 等工具。
+这是 `aivanelabs/ai-rpa` 的公开仓库。当前公开面是 **AIVane Android REPL Beta**：一个可直接安装的 `agent-android` CLI，加上一个可从 GitHub 安装的 `agent-android` skill，面向 Codex、Claude Code、OpenClaw 等工具。
 
 ## 从这里开始
 
+- 现在已经有现成可安装的 CLI 和 skill 入口，优先使用下面这些命令，不再把仓库内相对路径脚本当作主入口。
 - 下载 APK：[GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 - 安装 CLI：`uv tool install aivane-agent-android`
 - 安装 skill：`npx skills add aivanelabs/ai-rpa --skill agent-android`
