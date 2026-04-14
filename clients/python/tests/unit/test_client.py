@@ -181,6 +181,97 @@ def test_get_ui_elements_keeps_visible_only_cache_separate(client, monkeypatch):
     assert calls == [True, False]
 
 
+def test_fetch_ui_elements_impl_caches_package_name_from_outputs(client, monkeypatch):
+    monkeypatch.setattr(
+        client,
+        "_api_call",
+        lambda _template: {
+            "success": True,
+            "data": {
+                "outputs": {
+                    "uiElements": '[{"refId": 1, "text": "Search"}]',
+                    "currentPackage": "com.xingin.xhs",
+                }
+            },
+        },
+    )
+
+    assert client._fetch_ui_elements_impl() == [{"refId": 1, "text": "Search"}]
+    assert client._package_name_cache == "com.xingin.xhs"
+
+
+def test_get_ui_elements_reuses_package_name_from_get_aria_tree(client, monkeypatch):
+    saved = {}
+
+    monkeypatch.setattr(
+        client,
+        "_api_call",
+        lambda _template: {
+            "success": True,
+            "data": {
+                "outputs": {
+                    "uiElements": '[{"refId": 1, "text": "Search"}]',
+                    "currentPackage": "com.xingin.xhs",
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(client, "_get_package_name", lambda: pytest.fail("_get_package_name should not be called"))
+    monkeypatch.setattr(
+        client,
+        "_get_package_name_from_dump_tree",
+        lambda: pytest.fail("_get_package_name_from_dump_tree should not be called"),
+    )
+    monkeypatch.setattr(
+        client_module,
+        "save_snapshot",
+        lambda base_url, package_name, elements: saved.update(
+            {"base_url": base_url, "package_name": package_name, "elements": elements}
+        ),
+    )
+
+    elements = client.get_ui_elements(force_refresh=True)
+
+    assert elements == [{"refId": 1, "text": "Search"}]
+    assert saved == {
+        "base_url": "http://device:8080",
+        "package_name": "com.xingin.xhs",
+        "elements": [{"refId": 1, "text": "Search"}],
+    }
+
+
+def test_get_package_name_reads_outputs_block(client, monkeypatch):
+    monkeypatch.setattr(
+        client,
+        "_api_call",
+        lambda _template: {
+            "success": True,
+            "data": {"outputs": {"currentPackage": "com.xingin.xhs"}},
+        },
+    )
+
+    assert client._get_package_name() == "com.xingin.xhs"
+
+
+def test_get_current_package_name_uses_cache_before_fallback(client, monkeypatch):
+    calls = {"current": 0, "dump": 0}
+
+    def fake_current():
+        calls["current"] += 1
+        return "com.xingin.xhs"
+
+    def fake_dump():
+        calls["dump"] += 1
+        return "should-not-be-used"
+
+    monkeypatch.setattr(client, "_get_package_name", fake_current)
+    monkeypatch.setattr(client, "_get_package_name_from_dump_tree", fake_dump)
+
+    assert client.get_current_package_name() == "com.xingin.xhs"
+    assert client.get_current_package_name() == "com.xingin.xhs"
+    assert calls == {"current": 1, "dump": 0}
+
+
 def test_resolve_action_target_rejects_snapshot_from_other_package(client, monkeypatch, capsys):
     client._snapshot = {
         "baseUrl": "http://device:8080",

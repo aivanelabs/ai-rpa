@@ -195,6 +195,14 @@ class AgentAndroidClient:
         outputs = result.get('data', {}).get('outputs', {})
         return outputs if isinstance(outputs, dict) else {}
 
+    def _invalidate_ui_state_cache(self) -> None:
+        """Clear cached UI state after a successful UI-changing action."""
+        self._local_tree = None
+        self._local_tree_visible_only = True
+        self._ui_tree_xml_cache = None
+        self._ui_tree_xml_cache_visible_only = True
+        self._package_name_cache = None
+
     def _element_identity(self, elem: Dict[str, Any]) -> Tuple[Any, ...]:
         return (
             elem.get("resourceId"),
@@ -267,10 +275,7 @@ class AgentAndroidClient:
         result = self._execute_single_operation(template_id, operation_type, parameters)
         if result and result.get('success'):
             print(success_message)
-            self._local_tree = None
-            self._local_tree_visible_only = True
-            self._ui_tree_xml_cache = None
-            self._ui_tree_xml_cache_visible_only = True
+            self._invalidate_ui_state_cache()
             return True
 
         msg = result.get('errorMessage', 'Unknown error') if result else 'no response'
@@ -596,9 +601,12 @@ class AgentAndroidClient:
         """Fetch the UI element list from the API."""
         json_str = (
             '{"templateId":"ui-elements-get","templateName":"UI Elements Query",'
-            '"parameters":[{"name":"uiElements","type":"STRING","direction":"OUTPUT"}],'
+            '"parameters":['
+            '{"name":"uiElements","type":"STRING","direction":"OUTPUT"},'
+            '{"name":"currentPackage","type":"STRING","direction":"OUTPUT"}'
+            '],'
             '"operations":['
-            '{"operationType":"android.ui.getAriaTree","parameters":{"variableName":"tree","visibleOnly":%s}},'
+            '{"operationType":"android.ui.getAriaTree","parameters":{"variableName":"tree","visibleOnly":%s,"packageNameVariable":"currentPackage"}},'
             '{"operationType":"variable.assign","parameters":{"variableName":"uiElements","value":"\\u0024{tree}"}}'
             ']}'
         ) % ("true" if visible_only else "false")
@@ -610,11 +618,11 @@ class AgentAndroidClient:
             print(f"Error: {result.get('errorMessage', 'Unknown error')}", file=sys.stderr)
             return None
 
-        outputs = result.get('data', {}).get('outputs', {})
-        if isinstance(outputs, dict):
-            ui_elements_json = outputs.get('uiElements', '[]')
-        else:
-            ui_elements_json = '[]'
+        outputs = self._get_outputs(result)
+        ui_elements_json = outputs.get('uiElements', '[]') if isinstance(outputs, dict) else '[]'
+        package_name = outputs.get("currentPackage") if isinstance(outputs, dict) else None
+        if isinstance(package_name, str) and package_name.strip():
+            self._package_name_cache = package_name.strip()
 
         try:
             elements = json.loads(ui_elements_json)
@@ -837,14 +845,19 @@ class AgentAndroidClient:
         """Return the current foreground app package name."""
         template = {
             "templateId": "current-app",
+            "parameters": [
+                {"name": "currentPackage", "type": "STRING", "direction": "OUTPUT"}
+            ],
             "operations": [
                 {"operationType": "android.app.current", "parameters": {}}
             ]
         }
         result = self._api_call(template)
         if result and result.get('success'):
-            data = result.get('data', {})
-            return data.get('packageName')
+            outputs = self._get_outputs(result)
+            package_name = outputs.get("currentPackage")
+            if isinstance(package_name, str) and package_name.strip():
+                return package_name.strip()
         return None
 
     def _get_package_name_from_dump_tree(self) -> Optional[str]:
@@ -876,6 +889,8 @@ class AgentAndroidClient:
 
     def get_current_package_name(self) -> Optional[str]:
         """Public helper for querying the current foreground package name for listing and diagnostics."""
+        if self._package_name_cache:
+            return self._package_name_cache
         package_name = self._get_package_name()
         if not package_name:
             package_name = self._get_package_name_from_dump_tree()
@@ -912,10 +927,7 @@ class AgentAndroidClient:
         result = self._api_call(template)
         if result and result.get('success'):
             print(f"Pressed: {key}")
-            self._local_tree = None
-            self._local_tree_visible_only = True
-            self._ui_tree_xml_cache = None
-            self._ui_tree_xml_cache_visible_only = True
+            self._invalidate_ui_state_cache()
             return True
 
         msg = result.get('errorMessage', 'Unknown') if result else 'no response'

@@ -321,3 +321,7 @@ def main() -> int:
     _dump_input_elements(client, elements, args)
     _handle_tree_queries(client, elements, args)
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
