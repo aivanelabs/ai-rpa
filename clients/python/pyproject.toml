@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aivane-agent-android"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Local-first Android UI automation CLI for the AIVane Android REPL beta"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,6 +35,9 @@ agent-android = "agent_android.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "agent_android.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
