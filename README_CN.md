@@ -6,8 +6,13 @@
 
 ## 演示视频
 
-- 添加日程演示：[demo-calendar.mp4](docs/assets/demo-calendar.mp4)
-- 小红书搜索演示：[demo-xhs.mp4](docs/assets/demo-xhs.mp4)
+### 添加日程
+
+https://github.com/user-attachments/assets/f4e48dd4-386c-4df5-936e-37c3fa650fd4
+
+### 小红书搜索
+
+https://github.com/user-attachments/assets/7024b34b-73cd-4cc5-857e-90a84c341110
 
 ## 从这里开始
 
