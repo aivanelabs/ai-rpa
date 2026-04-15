@@ -6,7 +6,8 @@
 
 ## 演示视频
 
-- 快速看一遍产品操作流程：[ai-rpa-demo.mp4](docs/assets/ai-rpa-demo.mp4)
+- 添加日程演示：[demo-calendar.mp4](docs/assets/demo-calendar.mp4)
+- 小红书搜索演示：[demo-xhs.mp4](docs/assets/demo-xhs.mp4)
 
 ## 从这里开始
 

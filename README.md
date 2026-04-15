@@ -8,7 +8,8 @@ This repository is the public home for `aivanelabs/ai-rpa`. The current public s
 
 ## Demo
 
-- Quick product walkthrough: [ai-rpa-demo.mp4](docs/assets/ai-rpa-demo.mp4)
+- Add a calendar event: [demo-calendar.mp4](docs/assets/demo-calendar.mp4)
+- Search on Xiaohongshu: [demo-xhs.mp4](docs/assets/demo-xhs.mp4)
 
 ## Start Here
 
