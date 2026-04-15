@@ -6,6 +6,10 @@ Control an Android phone from your desktop or AI agent in minutes: inspect UI, t
 
 This repository is the public home for `aivanelabs/ai-rpa`. The current public surface is **AIVane Android REPL Beta**: a directly installable `agent-android` CLI plus a GitHub-installable `agent-android` skill for tools such as Codex, Claude Code, and OpenClaw.
 
+## Demo
+
+- Quick product walkthrough: [ai-rpa-demo.mp4](docs/assets/ai-rpa-demo.mp4)
+
 ## Start Here
 
 - The beta already has a ready-to-install CLI and skill path; use the commands below instead of repo-local script paths.
@@ -126,6 +130,7 @@ If you want the full setup path, see [docs/install-agent-android.md](docs/instal
 
 - `clients/python/`: publishable Python CLI package using a standard `src` layout
 - `docs/`: quickstart, install, protocol, permissions, release, and support docs
+- `docs/assets/`: README-linked media such as demo videos and screenshots
 - `examples/`: smoke-flow examples and launch helpers
 - `skills/agent-android/`: installable public skill definition
 
