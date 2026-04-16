@@ -48,51 +48,46 @@ Keep the loop short. Prefer inspect -> act -> inspect over long speculative comm
 
 Start the REPL with the user-provided device URL:
 
-```bash
-agent-android --repl --url http://<device-ip>:8080
-```
+- `agent-android --repl --url http://<device-ip>:8080`
 
 Built-in help:
 
-```bash
-agent-android --help
-```
-
-```text
-h
-```
+- `agent-android --help`
+- In the REPL: `h`
 
 ## Essential CLI Commands
 
 Use the one-off CLI when you already know the exact action you want.
 
-```bash
-# Connectivity
-agent-android --health --url http://<device-ip>:8080
+Connectivity:
 
-# Discovery
-agent-android --apps --url http://<device-ip>:8080
-agent-android --list --url http://<device-ip>:8080
-agent-android --id com.example:id/search --url http://<device-ip>:8080
-agent-android --text Search --url http://<device-ip>:8080
-agent-android --inputs --url http://<device-ip>:8080
-agent-android --refId 7 --url http://<device-ip>:8080
-agent-android --xpath 7 --url http://<device-ip>:8080
-agent-android --get-attr 7 text --url http://<device-ip>:8080
+- `agent-android --health --url http://<device-ip>:8080`
 
-# Actions
-agent-android --launch com.xingin.xhs --url http://<device-ip>:8080
-agent-android --tap 7 --url http://<device-ip>:8080
-agent-android --input 7 "hello world" --url http://<device-ip>:8080
-agent-android --swipe up --url http://<device-ip>:8080
-agent-android --back --url http://<device-ip>:8080
-agent-android --press home --url http://<device-ip>:8080
-agent-android --screenshot --url http://<device-ip>:8080
+Discovery:
 
-# Waiting and output
-agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
-agent-android --list --raw --url http://<device-ip>:8080
-```
+- `agent-android --apps --url http://<device-ip>:8080`
+- `agent-android --list --url http://<device-ip>:8080`
+- `agent-android --id com.example:id/search --url http://<device-ip>:8080`
+- `agent-android --text Search --url http://<device-ip>:8080`
+- `agent-android --inputs --url http://<device-ip>:8080`
+- `agent-android --refId 7 --url http://<device-ip>:8080`
+- `agent-android --xpath 7 --url http://<device-ip>:8080`
+- `agent-android --get-attr 7 text --url http://<device-ip>:8080`
+
+Actions:
+
+- `agent-android --launch com.xingin.xhs --url http://<device-ip>:8080`
+- `agent-android --tap 7 --url http://<device-ip>:8080`
+- `agent-android --input 7 "hello world" --url http://<device-ip>:8080`
+- `agent-android --swipe up --url http://<device-ip>:8080`
+- `agent-android --back --url http://<device-ip>:8080`
+- `agent-android --press home --url http://<device-ip>:8080`
+- `agent-android --screenshot --url http://<device-ip>:8080`
+
+Waiting and output:
+
+- `agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080`
+- `agent-android --list --raw --url http://<device-ip>:8080`
 
 ## REPL Command Reference
 
@@ -180,32 +175,23 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
 
 ### Find the right package before launch
 
-```text
-apps
-la com.example.app
-l
-```
+- `apps`
+- `la com.example.app`
+- `l`
 
 ### Inspect an element before using XPath
 
-```text
-l
-ref 12
-x 12
-vx //EditText[@text='Search']
-```
+- `l`
+- `ref 12`
+- `x 12`
+- `vx //EditText[@text='Search']`
 
 ### Clear and refill an input
 
-```text
-i 7 --clear
-i 7 hello world
-```
-
-```text
-ix //EditText[@text='Search'] --
-ix //EditText[@text='Search'] -- hello world
-```
+- `i 7 --clear`
+- `i 7 hello world`
+- `ix //EditText[@text='Search'] --`
+- `ix //EditText[@text='Search'] -- hello world`
 
 ## Troubleshooting
 
