@@ -1,6 +1,6 @@
 ---
 name: agent-android
-description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher apps and UI state, and control the phone step by step through the public REPL/CLI path. Use this when Codex needs Android phone control for AI-agent tasks such as checking device connectivity, listing launchable apps, launching an app, inspecting the current UI tree, tapping, inputting text, swiping, navigating back/home, taking screenshots, or running a small end-to-end smoke flow with the public CLI.
+description: Control Android over LAN without USB, ADB, or root.
 metadata: {"openclaw":{"homepage":"https://github.com/aivanelabs/ai-rpa","requires":{"bins":["agent-android"]},"install":[{"id":"agent-android-uv","kind":"uv","package":"aivane-agent-android","bins":["agent-android"],"label":"Install agent-android CLI (uv)"}]}}
 ---
 
