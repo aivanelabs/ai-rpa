@@ -7,17 +7,15 @@ description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher
 
 Use this skill to drive an Android device through the public `agent-android` beta surface published in the `aivanelabs/ai-rpa` repo.
 
-Prerequisites:
+Runtime prerequisites:
 
-- install `uv` first:
+- `uv` is installed:
   - https://docs.astral.sh/uv/getting-started/installation/
-- install the CLI:
+- the `agent-android` CLI is installed:
   - `uv tool install aivane-agent-android`
 - if `agent-android` is not found afterwards:
   - `uv tool update-shell`
-- make sure `agent-android` is available on `PATH`
-- install the skill from GitHub with:
-  `npx skills add aivanelabs/ai-rpa --skill agent-android`
+- `agent-android` is available on `PATH`
 
 The public path is local-first:
 
@@ -27,6 +25,14 @@ The public path is local-first:
 - the current tradeoff is LAN-only control; an optional server-side or relay path may arrive later
 
 If an `agent-android` command suddenly stops working, first check whether the AIVane app or its local API service has exited on the phone.
+
+## Safety Boundaries
+
+- Connect only to a device URL explicitly provided by the user.
+- Do not scan local networks or guess device IP addresses.
+- Treat UI trees and screenshots as sensitive because they may contain private app content.
+- Ask for confirmation before operating payment, banking, password manager, or private messaging screens.
+- Do not expose the phone-side service on a public network.
 
 ## Core Workflow
 
