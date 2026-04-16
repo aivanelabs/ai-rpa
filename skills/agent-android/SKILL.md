@@ -11,6 +11,7 @@ Use this skill to drive an Android device through the public `agent-android` bet
 Runtime prerequisites:
 
 - `agent-android` is available on `PATH`
+- if it is missing, install the CLI with `uv tool install aivane-agent-android`; then run `uv tool update-shell` if the command is still not found
 - the user has provided a trusted device URL such as `http://<device-ip>:8080`
 
 The public path is local-first:
