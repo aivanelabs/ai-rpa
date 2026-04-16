@@ -1,6 +1,7 @@
 ---
 name: agent-android
 description: Connect to AIVane (AI Mobile Automation) over LAN, inspect launcher apps and UI state, and control the phone step by step through the public REPL/CLI path. Use this when Codex needs Android phone control for AI-agent tasks such as checking device connectivity, listing launchable apps, launching an app, inspecting the current UI tree, tapping, inputting text, swiping, navigating back/home, taking screenshots, or running a small end-to-end smoke flow with the public CLI.
+metadata: {"openclaw":{"homepage":"https://github.com/aivanelabs/ai-rpa","requires":{"bins":["agent-android"]},"install":[{"id":"agent-android-uv","kind":"uv","package":"aivane-agent-android","bins":["agent-android"],"label":"Install agent-android CLI (uv)"}]}}
 ---
 
 # Android REPL
@@ -9,13 +10,8 @@ Use this skill to drive an Android device through the public `agent-android` bet
 
 Runtime prerequisites:
 
-- `uv` is installed:
-  - https://docs.astral.sh/uv/getting-started/installation/
-- the `agent-android` CLI is installed:
-  - `uv tool install aivane-agent-android`
-- if `agent-android` is not found afterwards:
-  - `uv tool update-shell`
 - `agent-android` is available on `PATH`
+- the user has provided a trusted device URL such as `http://<device-ip>:8080`
 
 The public path is local-first:
 
@@ -31,7 +27,8 @@ If an `agent-android` command suddenly stops working, first check whether the AI
 - Connect only to a device URL explicitly provided by the user.
 - Do not scan local networks or guess device IP addresses.
 - Treat UI trees and screenshots as sensitive because they may contain private app content.
-- Ask for confirmation before operating payment, banking, password manager, or private messaging screens.
+- Save screenshots or raw UI dumps only when the user explicitly asks for a file output.
+- Ask for confirmation before operating sensitive apps, private content, account settings, or irreversible actions.
 - Do not expose the phone-side service on a public network.
 
 ## Core Workflow
@@ -49,16 +46,10 @@ Keep the loop short. Prefer inspect -> act -> inspect over long speculative comm
 
 ## Quick Start
 
-Start the REPL:
+Start the REPL with the user-provided device URL:
 
 ```bash
 agent-android --repl --url http://<device-ip>:8080
-```
-
-Save the current device URL inside the REPL:
-
-```text
-set url http://<device-ip>:8080
 ```
 
 Built-in help:
@@ -100,7 +91,7 @@ agent-android --screenshot --url http://<device-ip>:8080
 
 # Waiting and output
 agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
-agent-android --list --raw --output tree.json --url http://<device-ip>:8080
+agent-android --list --raw --url http://<device-ip>:8080
 ```
 
 ## REPL Command Reference
@@ -166,8 +157,6 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
   Toggle raw JSON mode.
 - `vars`
   Show current URL, timeout, raw mode, and tree cache state.
-- `set url http://<device-ip>:8080`
-  Switch the server URL and persist it to local config.
 - `set timeout 30`
   Set the default wait timeout in seconds.
 - `h` or `help`
@@ -179,7 +168,7 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
 
 ### First smoke flow
 
-1. `set url http://<device-ip>:8080`
+1. Start the REPL with `agent-android --repl --url http://<device-ip>:8080`.
 2. `health`
 3. `apps`
 4. `la <package>`
