@@ -113,6 +113,31 @@ class AriaReplSession:
             if full:
                 self._aliases[full] = full
 
+    @classmethod
+    def from_client(
+        cls,
+        client: AgentAndroidClient,
+        *,
+        tree: Optional[List[Dict]] = None,
+        raw_output: bool = False,
+        timeout: int = 30,
+    ) -> "AriaReplSession":
+        """Create a non-interactive command runner backed by an existing client."""
+        session = cls.__new__(cls)
+        session.client = client
+        session._tree = tree
+        session._raw_output = raw_output
+        session._timeout = timeout
+        session._prompt = "aria> "
+        session.variables = {}
+        session._aliases = {}
+        for short, full, _ in cls.COMMANDS:
+            if short:
+                session._aliases[short] = full or short
+            if full:
+                session._aliases[full] = full
+        return session
+
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
 
