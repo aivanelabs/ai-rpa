@@ -4,12 +4,12 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from . import __version__
 from .client import AgentAndroidClient
 from .config import TOKEN_ENV_VAR, require_base_url, resolve_api_token
-from .formatting import _format_launcher_app, format_element, print_tree
+from .formatting import print_tree
 from .repl import AriaReplSession
 
 EPILOG = """AIVane Android REPL CLI helper for agent-android.
@@ -33,6 +33,10 @@ One-off examples:
     agent-android --swipe up --url http://<device-ip>:8080
     agent-android --screenshot --url http://<device-ip>:8080
     agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
+    agent-android --xpath 7 --url http://<device-ip>:8080
+    agent-android --validate-xpath "//Button[@text='OK']" --url http://<device-ip>:8080
+    agent-android --tap-xpath "//Button[@text='OK']" --url http://<device-ip>:8080
+    agent-android --ui-tree ui.xml --url http://<device-ip>:8080
 
 REPL quick reference:
     health / hl               Check the /health endpoint
@@ -107,7 +111,15 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--press", type=str, metavar="KEY", help="Press key: back / home / recents")
     group.add_argument("--get-attr", nargs=2, metavar=("REFID", "ATTR"), help="Get element attribute by refId (text/className/bounds/...)")
     group.add_argument("--refId", "-r", type=int, metavar="N", help="Get element details")
-    group.add_argument("--xpath", "-x", type=int, metavar="N", help="Get element XPath")
+    group.add_argument("--node", type=int, metavar="REFID", help="Print raw UI-tree node XML for refId")
+    group.add_argument("--xpath", "-x", type=int, metavar="N", help="Show XPath candidates for refId")
+    group.add_argument("--multi-xpath", "--multixpath", dest="multi_xpath", metavar="REFIDS", help="Find shared XPath candidates for comma/space-separated refIds")
+    group.add_argument("--tap-xpath-auto", type=int, metavar="REFID", help="Tap via a unique auto-generated XPath candidate")
+    group.add_argument("--validate-xpath", "--validatex", dest="validate_xpath", metavar="XPATH", help="Validate XPath runtime match count")
+    group.add_argument("--xpath-nodes", "--validatenodes", dest="xpath_nodes", metavar="XPATH", help="Print raw UI-tree node XML for XPath matches")
+    group.add_argument("--tap-xpath", "--tapx", dest="tap_xpath", metavar="XPATH", help="Tap by XPath locator")
+    group.add_argument("--input-xpath", "--inputx", dest="input_xpath", nargs=2, metavar=("XPATH", "TEXT"), help="Input text by XPath locator")
+    group.add_argument("--ui-tree", "--uitree", dest="ui_tree", nargs="?", const="_stdout_", metavar="OUTPUT_PATH", help="Print or save current UI tree XML")
     group.add_argument("--id", type=str, metavar="RESOURCE_ID", help="Query by resourceId")
     group.add_argument("--text", type=str, metavar="TEXT", help="Query by text")
     group.add_argument("--inputs", action="store_true", help="List all input fields")
@@ -115,6 +127,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--duration", type=int, default=300, help="Swipe duration in ms (default: 300)")
     parser.add_argument("--distance", type=float, default=0.5, help="Swipe distance ratio 0.0-1.0 (default: 0.5)")
     parser.add_argument("--quality", "-q", type=int, default=80, help="Screenshot quality 1-100 (default: 80)")
+    parser.add_argument("--match-index", type=int, help="Match index for --validate-xpath detail inspection")
+    parser.add_argument("--ui-tree-all", action="store_true", help="Include off-screen nodes for --ui-tree")
     parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
@@ -135,7 +149,31 @@ def _load_template_payload(path_str: str) -> Dict[str, Any]:
         raise SystemExit(1)
 
 
+def _session_for_client(
+    client: AgentAndroidClient,
+    *,
+    elements: Optional[List[Dict[str, Any]]] = None,
+    raw_output: bool = False,
+    timeout: int = 30,
+) -> AriaReplSession:
+    return AriaReplSession.from_client(
+        client,
+        tree=elements,
+        raw_output=raw_output,
+        timeout=timeout,
+    )
+
+
+def _exit_with_repl_result(result: Any) -> None:
+    raise SystemExit(0 if result else 1)
+
+
+def _split_ref_ids(value: str) -> List[str]:
+    return [part for part in value.replace(",", " ").split() if part]
+
+
 def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -> None:
+    session = _session_for_client(client, raw_output=args.raw, timeout=args.timeout)
     if args.template:
         payload = _load_template_payload(args.template)
         response = client.execute_template_payload(payload)
@@ -145,45 +183,45 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
         print(json.dumps(response, indent=2, ensure_ascii=False))
         raise SystemExit(0 if response.get("success") is True else 1)
     if args.health:
-        health = client.get_health()
-        if health is None:
-            print("Failed to fetch health. Check the connection hints above.", file=sys.stderr)
-            raise SystemExit(1)
-        print(json.dumps(health, indent=2, ensure_ascii=False))
-        raise SystemExit(0)
+        session._raw_output = True
+        _exit_with_repl_result(session._cmd_health([]))
     if args.back:
-        raise SystemExit(0 if client.press_back() else 1)
+        _exit_with_repl_result(session._cmd_back([]))
     if args.press:
-        raise SystemExit(0 if client.press_key(args.press) else 1)
+        _exit_with_repl_result(session._cmd_press([args.press]))
     if args.launch:
-        raise SystemExit(0 if client.launch_app(args.launch) else 1)
+        _exit_with_repl_result(session._cmd_launch([args.launch]))
     if args.apps:
-        apps = client.list_launcher_apps()
-        if apps is None:
-            print(
-                "Failed to fetch launcher apps. Check the connection hints above "
-                "and confirm the service is healthy.",
-                file=sys.stderr,
-            )
-            raise SystemExit(1)
-        if not apps:
-            print("No launcher apps returned.")
-            raise SystemExit(0)
-        print("Launcher apps:")
-        for index, app in enumerate(apps, start=1):
-            print(f"  [{index:02d}] {_format_launcher_app(app)}")
-        raise SystemExit(0)
+        _exit_with_repl_result(session._cmd_apps([]))
     if args.screenshot is not None:
         output_path = None if args.screenshot == "_auto_" else args.screenshot
         raise SystemExit(0 if client.screenshot(output_path=output_path, quality=args.quality) else 1)
     if args.swipe:
-        success = client.swipe(direction=args.swipe, duration=args.duration, distance=args.distance)
-        raise SystemExit(0 if success else 1)
+        _exit_with_repl_result(
+            session._cmd_swipe([args.swipe, "--dur", str(args.duration), "--dist", str(args.distance)])
+        )
     if args.tap is not None:
-        raise SystemExit(0 if client.tap_element(args.tap) else 1)
+        _exit_with_repl_result(session._cmd_tap([str(args.tap)]))
     if args.input:
-        ref_id = int(args.input[0])
-        raise SystemExit(0 if client.input_to_element(ref_id, args.input[1]) else 1)
+        _exit_with_repl_result(session._cmd_input([args.input[0], args.input[1]]))
+    if args.tap_xpath:
+        _exit_with_repl_result(session._cmd_tapx([args.tap_xpath]))
+    if args.input_xpath:
+        _exit_with_repl_result(session._cmd_inputx([args.input_xpath[0], args.input_xpath[1]]))
+    if args.validate_xpath:
+        command_args = [args.validate_xpath]
+        if args.match_index is not None:
+            command_args.append(str(args.match_index))
+        _exit_with_repl_result(session._cmd_validatex(command_args))
+    if args.xpath_nodes:
+        _exit_with_repl_result(session._cmd_validatenodes([args.xpath_nodes]))
+    if args.ui_tree is not None:
+        command_args: List[str] = []
+        if args.ui_tree != "_stdout_":
+            command_args.append(args.ui_tree)
+        if args.ui_tree_all:
+            command_args.append("--all")
+        _exit_with_repl_result(session._cmd_uitree(command_args))
 
 
 def _run_wait_command(args: argparse.Namespace, client: AgentAndroidClient) -> None:
@@ -243,37 +281,41 @@ def _handle_tree_queries(
     elements: List[Dict[str, Any]],
     args: argparse.Namespace,
 ) -> None:
+    session = _session_for_client(
+        client,
+        elements=elements,
+        raw_output=args.raw,
+        timeout=args.timeout,
+    )
     results = elements
 
     if args.get_attr:
-        ref_id = int(args.get_attr[0])
-        value = client.get_attribute(ref_id, args.get_attr[1])
-        if value is not None:
-            print(value)
-            raise SystemExit(0)
-        raise SystemExit(1)
+        _exit_with_repl_result(session._cmd_get([args.get_attr[0], args.get_attr[1]]))
 
-    if args.refId:
-        elem = client.find_by_refId(elements, args.refId)
-        if elem:
-            print(format_element(elem))
-            return
-        print(f"Element with refId={args.refId} not found")
-        raise SystemExit(1)
+    if args.refId is not None:
+        _exit_with_repl_result(session._cmd_ref([str(args.refId)]))
 
-    if args.xpath:
-        elem = client.find_by_refId(elements, args.xpath)
-        if elem:
-            print(elem.get("xpath", ""))
-            return
-        print(f"Element with refId={args.xpath} not found")
-        raise SystemExit(1)
+    if args.node is not None:
+        _exit_with_repl_result(session._cmd_node([str(args.node)]))
+
+    if args.xpath is not None:
+        _exit_with_repl_result(session._cmd_xpath([str(args.xpath)]))
+
+    if args.multi_xpath:
+        _exit_with_repl_result(session._cmd_multixpath(_split_ref_ids(args.multi_xpath)))
+
+    if args.tap_xpath_auto is not None:
+        _exit_with_repl_result(session._cmd_xx([str(args.tap_xpath_auto)]))
 
     if args.id:
+        if not args.raw and not args.filter:
+            _exit_with_repl_result(session._cmd_id([args.id]))
         results = client.find_by_resourceId(elements, args.id)
         if not results:
             print(f"No elements with resourceId={args.id}")
     elif args.text:
+        if not args.raw and not args.filter:
+            _exit_with_repl_result(session._cmd_find([args.text]))
         results = client.find_by_text(elements, args.text)
         if not results:
             print(f"No elements with text containing '{args.text}'")
@@ -281,6 +323,8 @@ def _handle_tree_queries(
         args.list = True
 
     if args.list or args.text or args.id:
+        if args.list and not args.raw and not args.filter:
+            _exit_with_repl_result(session._cmd_list([]))
         if args.raw:
             print(json.dumps(results, indent=2, ensure_ascii=False))
         else:
@@ -290,6 +334,10 @@ def _handle_tree_queries(
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.match_index is not None and not args.validate_xpath:
+        parser.error("--match-index requires --validate-xpath")
+    if args.ui_tree_all and args.ui_tree is None:
+        parser.error("--ui-tree-all requires --ui-tree")
     url = require_base_url(args.url)
     token = resolve_api_token(args.token)
 

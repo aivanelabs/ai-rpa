@@ -236,6 +236,188 @@ def test_main_template_reports_missing_file(monkeypatch, capsys):
     assert "Template file not found:" in captured.err
 
 
+def test_main_xpath_uses_repl_candidate_logic(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def get_ui_elements(self, wait=0, force_refresh=False, visible_only=True):
+            return [
+                {
+                    "refId": 5,
+                    "text": "Search",
+                    "simpleClassName": "EditText",
+                    "xpath": "/old/tree/path",
+                }
+            ]
+
+        def find_by_refId(self, elements, ref_id):
+            return elements[0] if ref_id == 5 else None
+
+        def generate_xpath_candidates(self, _elem, _tree):
+            return [("//EditText[@text='Search']", 1, "text")]
+
+        def validate_xpath_runtime(self, xpath):
+            return {"xpath": xpath, "count": 1, "className": "EditText", "text": "Search"}
+
+        def build_ui_tree_absolute_xpath(self, _tree, _elem):
+            return "/old/tree/path"
+
+        def build_runtime_absolute_xpath(self, _tree, _elem):
+            return "/hierarchy/EditText[@text='Search']"
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--xpath", "5"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "Recommended: //EditText[@text='Search']" in captured.out
+    assert "runtime matched exactly 1 element" in captured.out
+    assert captured.out.strip() != "/old/tree/path"
+
+
+def test_main_node_uses_repl_node_handler(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def get_ui_elements(self, wait=0, force_refresh=False, visible_only=True):
+            return [{"refId": 5, "simpleClassName": "EditText", "bounds": "[0,0][100,50]"}]
+
+        def find_by_refId(self, elements, ref_id):
+            return elements[0] if ref_id == 5 else None
+
+        def get_node_snippet_for_element(self, elem):
+            return f'<node index="{elem["refId"]}" class="android.widget.EditText" />'
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--node", "5"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert '<node index="5" class="android.widget.EditText" />' in captured.out
+
+
+def test_main_validate_xpath_uses_repl_handler(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def validate_xpath_runtime(self, xpath):
+            return {"xpath": xpath, "count": 2}
+
+        def describe_xpath_match(self, xpath, index=0):
+            assert xpath == "//many"
+            assert index == 1
+            return {
+                "className": "EditText",
+                "text": "Other",
+                "contentDescription": "",
+                "bounds": "[0,50][100,100]",
+                "x": 120,
+                "y": 320,
+                "isInput": True,
+            }
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-android", "--url", "http://device:8080", "--validate-xpath", "//many", "--match-index", "1"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "XPath: //many" in captured.out
+    assert "matches: 2" in captured.out
+    assert "position: (120, 320)" in captured.out
+
+
+def test_main_multixpath_uses_repl_handler(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def get_ui_elements(self, wait=0, force_refresh=False, visible_only=True):
+            return [{"refId": 6}, {"refId": 7}]
+
+        def find_by_refId(self, elements, ref_id):
+            for elem in elements:
+                if elem["refId"] == ref_id:
+                    return elem
+            return None
+
+        def generate_multi_xpath_candidates(self, elems, _tree):
+            assert [elem["refId"] for elem in elems] == [6, 7]
+            return [("/hierarchy/RecyclerView[1]/FrameLayout", 2, "same-parent class")]
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-android", "--url", "http://device:8080", "--multi-xpath", "6,7"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "refIds=6,7  targetCount=2" in captured.out
+    assert "Recommended exact: /hierarchy/RecyclerView[1]/FrameLayout" in captured.out
+
+
+def test_main_tap_and_input_xpath_use_repl_handlers(monkeypatch):
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def tap_by_xpath(self, xpath):
+            seen["tap"] = xpath
+            return True
+
+        def input_by_xpath(self, xpath, text):
+            seen["input"] = (xpath, text)
+            return True
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--tap-xpath", "//Button"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    assert exc_info.value.code == 0
+    assert seen["tap"] == "//Button"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-android", "--url", "http://device:8080", "--input-xpath", "//EditText", "hello"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    assert exc_info.value.code == 0
+    assert seen["input"] == ("//EditText", "hello")
+
+
 def test_cli_help_mentions_new_repl_commands(capsys):
     parser = cli_module.build_parser()
 
@@ -249,3 +431,7 @@ def test_cli_help_mentions_new_repl_commands(capsys):
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
     assert "p <key>                   Press a system key (back/home/recents)" in captured.out
+    assert "--node REFID" in captured.out
+    assert "--multi-xpath REFIDS" in captured.out
+    assert "--validate-xpath XPATH" in captured.out
+    assert "--tap-xpath XPATH" in captured.out
