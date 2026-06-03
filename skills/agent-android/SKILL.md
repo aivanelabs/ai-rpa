@@ -84,6 +84,7 @@ Actions:
 - `agent-android --back --url http://<device-ip>:8080`
 - `agent-android --press home --url http://<device-ip>:8080`
 - `agent-android --screenshot --url http://<device-ip>:8080`
+- `agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080`
 
 Waiting and output:
 
@@ -137,6 +138,8 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
   Launch an app by package name.
 - `s [path]` or `screenshot [path]`
   Capture a screenshot to an auto-generated or explicit path.
+- `up <local> <path>` or `upload <local> <path>`
+  Upload a local file to the phone. Overwrites by default; add `--no-overwrite` to reject an existing target.
 
 ### Wait And Inspect
 
@@ -193,6 +196,12 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
 - `i 7 hello world`
 - `ix //EditText[@text='Search'] --`
 - `ix //EditText[@text='Search'] -- hello world`
+
+### Sync a sub-template before execution
+
+- `agent-android --upload child.json --remote-path Templates/child.json --url http://<device-ip>:8080`
+- `agent-android --template main.json --url http://<device-ip>:8080`
+- Use `--no-overwrite` only when preserving an existing phone-side file matters.
 
 ## Troubleshooting
 

@@ -15,6 +15,7 @@ class _DummyClient:
         self.input_calls = []
         self.input_xpath_calls = []
         self.pressed_keys = []
+        self.upload_calls = []
 
     def get_ui_elements(self, force_refresh=False):
         return [
@@ -129,6 +130,10 @@ class _DummyClient:
         self.pressed_keys.append(key)
         return True
 
+    def upload_file(self, local_path, remote_path, overwrite=True):
+        self.upload_calls.append((local_path, remote_path, overwrite))
+        return {"success": True, "path": remote_path, "bytes": 2}
+
 
 @pytest.fixture
 def session(monkeypatch):
@@ -183,6 +188,13 @@ def test_parse_line_uses_shell_style_splitting_for_regular_commands(session):
 
     assert command == "set"
     assert args == ["timeout", "45"]
+
+
+def test_parse_line_preserves_quoted_upload_path_for_repl_unquoting(session):
+    command, args = session._parse_line('up "C:\\tmp\\foo bar.json" Templates/foo.json')
+
+    assert command == "up"
+    assert args == ['"C:\\tmp\\foo bar.json"', "Templates/foo.json"]
 
 
 def test_execute_line_reports_unknown_command(session, capsys):
@@ -367,6 +379,25 @@ def test_cmd_uitree_supports_all_nodes_and_saving(session, tmp_path, capsys):
     assert output_path.read_text(encoding="utf-8") == "<hierarchy source='all' refresh='true' />"
 
 
+def test_cmd_upload_defaults_to_overwrite(session, tmp_path, capsys):
+    source = tmp_path / "foo.json"
+    source.write_text("{}", encoding="utf-8")
+
+    assert session._cmd_upload([str(source), "Templates/foo.json"]) is True
+
+    captured = capsys.readouterr()
+    assert session.client.upload_calls == [(str(source), "Templates/foo.json", True)]
+    assert f"Uploaded {source} -> Templates/foo.json (2 bytes)" in captured.out
+
+
+def test_cmd_upload_supports_no_overwrite_and_strips_quotes(session, capsys):
+    assert session._cmd_upload(['"C:\\tmp\\foo bar.json"', "Templates/foo.json", "--no-overwrite"]) is True
+
+    captured = capsys.readouterr()
+    assert session.client.upload_calls == [("C:\\tmp\\foo bar.json", "Templates/foo.json", False)]
+    assert "Uploaded C:\\tmp\\foo bar.json -> Templates/foo.json" in captured.out
+
+
 def test_cmd_xpath_does_not_store_last_xpath_dead_state(session):
     session.variables["LAST_XPATH"] = "//stale"
 
@@ -452,6 +483,7 @@ def test_help_text_matches_current_xpath_and_press_usage(session, capsys):
     assert "mx <ids>" in captured.out
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
+    assert "up <local> <path>" in captured.out
     assert "x <N>" not in captured.out
     assert "p <key>           Press a key (back/home/recents)" in captured.out
     assert "Press a key (back/home/menu/enter/delete/power)" not in captured.out

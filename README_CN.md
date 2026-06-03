@@ -102,6 +102,16 @@ Use the installed agent-android skill to:
 
 如果你想看完整安装路径，请看 [docs/install-agent-android.md](docs/install-agent-android.md) 和 [docs/quickstart.md](docs/quickstart.md)。
 
+## 模板和文件同步
+
+如果你想把电脑上的子模板、图片或普通二进制文件推送到手机端 REPL 可访问的本地路径，可以用 CLI 上传：
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
+```
+
+默认会覆盖目标文件。需要拒绝覆盖时加 `--no-overwrite`。如果文件在某个 URL 上，需要让手机端模板自己下载并保存，请用 `http.download`；它适合图片、JSON 模板、zip、文本文件和其他二进制文件。`http.get` 仍然适合把文本或 JSON 响应读入变量。
+
 ## 这个 Beta 是什么
 
 - 基于局域网的本地优先 Android 自动化

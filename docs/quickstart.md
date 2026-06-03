@@ -99,6 +99,22 @@ agent-android --input <refId> "hello" --url http://<device-ip>:8080
 agent-android --back --url http://<device-ip>:8080
 ```
 
+## Sync Templates Or Files
+
+To push a frequently edited sub-template, image, or ordinary binary file from the desktop to the phone:
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
+```
+
+`--upload` overwrites by default. Add `--no-overwrite` when you want the command to fail if the target already exists:
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --no-overwrite --url http://<device-ip>:8080
+```
+
+After uploading `Templates/<templateId>.json`, run the main template with `--template`; phone-side `template.execute` can then resolve the updated sub-template from the local repository. If a template needs the phone itself to fetch a file from a URL, use `http.download` for images, zip files, JSON templates, text files, or other binary content. Keep `http.get` for text or JSON responses that should be read into variables.
+
 ## Notes
 
 - `/execute` remains available for advanced multi-step templates.

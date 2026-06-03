@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import urllib.error
+import urllib.parse
 
 import pytest
 
@@ -22,6 +23,20 @@ class _FakeClock:
 
     def sleep(self, seconds):
         self.now += seconds
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self):
+        return self._payload
 
 
 @pytest.fixture
@@ -103,22 +118,12 @@ def test_api_call_connection_error_prints_actionable_hint(client, capsys):
 def test_api_call_sends_token_header(monkeypatch):
     captured = {}
 
-    class _FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return b'{"success": true}'
-
     class _RecordingOpener:
         def open(self, request, *_args, **_kwargs):
             headers = {key.lower(): value for key, value in request.header_items()}
             captured["token"] = headers.get("x-api-token")
             captured["url"] = request.full_url
-            return _FakeResponse()
+            return _FakeResponse(b'{"success": true}')
 
     monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
     token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
@@ -128,6 +133,67 @@ def test_api_call_sends_token_header(monkeypatch):
         "token": "shared-secret",
         "url": "http://device:8080/execute",
     }
+
+
+def test_upload_file_posts_raw_body_with_token(monkeypatch, tmp_path):
+    captured = {}
+    source = tmp_path / "foo.json"
+    source.write_bytes(b'{"ok":true}')
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **kwargs):
+            parsed = urllib.parse.urlparse(request.full_url)
+            query = urllib.parse.parse_qs(parsed.query)
+            headers = {key.lower(): value for key, value in request.header_items()}
+            captured["path"] = parsed.path
+            captured["query"] = query
+            captured["method"] = request.get_method()
+            captured["body"] = request.data
+            captured["headers"] = headers
+            captured["timeout"] = kwargs.get("timeout")
+            return _FakeResponse(b'{"success": true, "path": "Templates/foo.json", "bytes": 11}')
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
+
+    result = token_client.upload_file(str(source), "Templates/foo.json", overwrite=False)
+
+    assert result == {"success": True, "path": "Templates/foo.json", "bytes": 11}
+    assert captured["path"] == "/upload"
+    assert captured["query"] == {"path": ["Templates/foo.json"], "overwrite": ["false"]}
+    assert captured["method"] == "POST"
+    assert captured["body"] == b'{"ok":true}'
+    assert captured["headers"]["x-api-token"] == "shared-secret"
+    assert captured["headers"]["content-type"] == "application/octet-stream"
+    assert captured["timeout"] == 60
+
+
+def test_upload_file_defaults_to_overwrite_true(monkeypatch, tmp_path):
+    captured = {}
+    source = tmp_path / "image.png"
+    source.write_bytes(b"png")
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **_kwargs):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)
+            captured["overwrite"] = query["overwrite"]
+            return _FakeResponse(b"{}")
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    upload_client = client_module.AgentAndroidClient("http://device:8080")
+
+    result = upload_client.upload_file(str(source), "Images/foo.png")
+
+    assert result == {"success": True, "path": "Images/foo.png", "bytes": 3}
+    assert captured["overwrite"] == ["true"]
+
+
+def test_upload_file_missing_local_file_returns_none(client, tmp_path, capsys):
+    missing = tmp_path / "missing.json"
+
+    assert client.upload_file(str(missing), "Templates/missing.json") is None
+
+    assert "Upload file not found:" in capsys.readouterr().err
 
 
 def test_get_ui_elements_caches_results_and_saves_snapshot(client, monkeypatch):
