@@ -37,6 +37,8 @@ class AriaReplSession:
       i 5 hello            -> input text into refId=5
       s                    -> capture a screenshot with an auto-generated name
       s my.png             -> capture a screenshot to a specific path
+      up foo.json Templates/foo.json -> upload a file to the phone
+      up foo.json Templates/foo.json --no-overwrite -> refuse to overwrite
       sw d                 -> swipe down (down/up/left/right)
       sw d --dur 500 --dist 0.7  -> swipe down for 500ms at distance 0.7
       wf Search            -> wait for a "Search" element (default 30s)
@@ -82,6 +84,7 @@ class AriaReplSession:
         ('g', 'get',           'Read an element attribute'),
         ('s', 'screenshot',    'Capture a screenshot'),
         ('ux', 'uitree',       'Print or save the current UI tree XML'),
+        ('up', 'upload',       'Upload a file to the phone'),
         ('la', 'launch',       'Launch an app'),
         ('raw', None,          'Toggle raw JSON output'),
         ('vars', None,         'Show session variables'),
@@ -275,6 +278,11 @@ class AriaReplSession:
         if raw_text in {'""', "''"}:
             return ''
         return raw_text
+
+    def _strip_arg_quotes(self, value: str) -> str:
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            return value[1:-1]
+        return value
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -1079,6 +1087,48 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
 
+    def _cmd_upload(self, args: List[str]) -> bool:
+        """up <localFile> <remotePath> [--no-overwrite] - upload a file."""
+        overwrite = True
+        positional: List[str] = []
+        for arg in args:
+            if arg == "--no-overwrite":
+                overwrite = False
+                continue
+            positional.append(self._strip_arg_quotes(arg))
+
+        if len(positional) != 2:
+            self._print_error("Usage: up <localFile> <remotePath> [--no-overwrite]")
+            self._print_error("  Example: up foo.json Templates/foo.json")
+            self._print_error("  Example: up foo.json Templates/foo.json --no-overwrite")
+            return False
+
+        local_path, remote_path = positional
+        response = self.client.upload_file(local_path, remote_path, overwrite=overwrite)
+        if response is None:
+            self._print_error("Upload failed. Check the connection hints above.")
+            return False
+
+        if self._raw_output:
+            print(json.dumps(response, indent=2, ensure_ascii=False))
+            return response.get("success") is not False
+
+        if response.get("success") is False:
+            msg = response.get("errorMessage") or response.get("message") or response.get("error") or "Unknown error"
+            self._print_error(f"Upload failed: {msg}")
+            return False
+
+        size = response.get("bytes")
+        size_label = f"{size} bytes" if isinstance(size, int) else "uploaded"
+        print(f"  Uploaded {local_path} -> {remote_path} ({size_label})")
+        return True
+
+    def _cmd_up(self, args: List[str]) -> bool:
+        return self._cmd_upload(args)
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
     def _cmd_launch(self, args: List[str]) -> bool:
         """la <package> - launch an app."""
         if not args:
@@ -1242,6 +1292,8 @@ class AriaReplSession:
             "    s [path]          Capture a screenshot (no argument = auto filename)",
             "    ux [path] [--all] Print the current UI tree XML or save it to a file",
             "                       Use --all to include off-screen nodes in the XML dump",
+            "    up <local> <path> Upload a local file to the phone (overwrites by default)",
+            "                       Add --no-overwrite to fail when the target already exists",
             "    la <package>      Launch an app (for example com.xingin.xhs)",
             "",
             "  Session",
@@ -1258,7 +1310,7 @@ class AriaReplSession:
             "",
             "  Shortcuts: l->list, ss->snapshot, t->tap, tx->tapx, xx->tapx-auto,",
             "              i->input, ix->inputx, sw->swipe, p->press, b->back,",
-            "              wf->waitfor, g->get, s->screenshot, ux->uitree, la->launch, hl->health, vx->validatex,",
+            "              wf->waitfor, g->get, s->screenshot, ux->uitree, up->upload, la->launch, hl->health, vx->validatex,",
             "              mx->multixpath,",
             "              ref->ref, node->node, x->xpath, vn->validatenodes, f->find, h->help, q->quit",
             "",

@@ -236,6 +236,100 @@ def test_main_template_reports_missing_file(monkeypatch, capsys):
     assert "Template file not found:" in captured.err
 
 
+def test_main_upload_passes_default_overwrite_true(monkeypatch, tmp_path, capsys):
+    seen = {}
+    source = tmp_path / "foo.json"
+    source.write_text("{}", encoding="utf-8")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            seen["url"] = url
+            seen["token"] = token
+
+        def upload_file(self, local_path, remote_path, overwrite=True):
+            seen["upload"] = (local_path, remote_path, overwrite)
+            return {"success": True, "path": remote_path, "bytes": 2}
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--token",
+            "shared-secret",
+            "--upload",
+            str(source),
+            "--remote-path",
+            "Templates/foo.json",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert seen == {
+        "url": "http://device:8080",
+        "token": "shared-secret",
+        "upload": (str(source), "Templates/foo.json", True),
+    }
+    assert f"Uploaded {source} -> Templates/foo.json (2 bytes)" in captured.out
+
+
+def test_main_upload_no_overwrite_passes_false(monkeypatch, tmp_path):
+    seen = {}
+    source = tmp_path / "foo.json"
+    source.write_text("{}", encoding="utf-8")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def upload_file(self, local_path, remote_path, overwrite=True):
+            seen["upload"] = (local_path, remote_path, overwrite)
+            return {"success": True}
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--upload",
+            str(source),
+            "--remote-path",
+            "Templates/foo.json",
+            "--no-overwrite",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    assert exc_info.value.code == 0
+    assert seen["upload"] == (str(source), "Templates/foo.json", False)
+
+
+def test_main_upload_requires_remote_path(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "foo.json"
+    source.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--upload", str(source)])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "--upload requires --remote-path" in captured.err
+
+
 def test_main_xpath_uses_repl_candidate_logic(monkeypatch, capsys):
     class FakeClient:
         def __init__(self, url, token=None):
@@ -430,8 +524,11 @@ def test_cli_help_mentions_new_repl_commands(capsys):
     assert "mx <ids>" in captured.out
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
+    assert "up <local> <path>" in captured.out
     assert "p <key>                   Press a system key (back/home/recents)" in captured.out
     assert "--node REFID" in captured.out
     assert "--multi-xpath REFIDS" in captured.out
     assert "--validate-xpath XPATH" in captured.out
     assert "--tap-xpath XPATH" in captured.out
+    assert "--upload LOCAL_FILE" in captured.out
+    assert "--remote-path REMOTE_PATH" in captured.out

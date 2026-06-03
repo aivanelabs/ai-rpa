@@ -78,6 +78,19 @@ class AgentAndroidClient:
             headers["x-api-token"] = self.token
         return headers
 
+    def _decode_json_response_body(self, body: bytes, fallback: Dict[str, Any]) -> Dict[str, Any]:
+        if not body.strip():
+            return dict(fallback)
+        try:
+            parsed = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return dict(fallback)
+        if isinstance(parsed, dict):
+            return parsed
+        result = dict(fallback)
+        result["data"] = parsed
+        return result
+
     def _api_call(self, template: Dict) -> Optional[Dict]:
         """Send an API request."""
         try:
@@ -100,6 +113,82 @@ class AgentAndroidClient:
     def execute_template_payload(self, payload: Dict[str, Any]) -> Optional[Dict]:
         """Execute a raw template payload via /execute."""
         return self._api_call(payload)
+
+    def upload_file(
+        self,
+        local_path: str,
+        remote_path: str,
+        overwrite: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Upload a local file to the phone-side /upload endpoint."""
+        destination = remote_path.strip() if isinstance(remote_path, str) else ""
+        if not destination:
+            print("Upload destination path is required", file=sys.stderr)
+            return None
+
+        try:
+            source_path = Path(local_path).expanduser()
+        except RuntimeError as exc:
+            print(f"Upload source path is invalid: {exc}", file=sys.stderr)
+            return None
+
+        if not source_path.is_file():
+            print(f"Upload file not found: {source_path}", file=sys.stderr)
+            return None
+
+        try:
+            payload = source_path.read_bytes()
+        except OSError as exc:
+            print(f"Failed to read upload file {source_path}: {exc}", file=sys.stderr)
+            return None
+
+        params = {
+            "path": destination,
+            "overwrite": "true" if overwrite else "false",
+        }
+        url = self.base_url + "/upload?" + urllib.parse.urlencode(params)
+        fallback: Dict[str, Any] = {
+            "success": True,
+            "path": destination,
+            "bytes": len(payload),
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers=self._build_headers(
+                    content_type="application/octet-stream",
+                    user_agent="agent-android/0.1",
+                ),
+                method="POST",
+            )
+            with self._opener.open(req, timeout=60) as response:
+                result = self._decode_json_response_body(response.read(), fallback)
+            result.setdefault("success", True)
+            result.setdefault("path", destination)
+            result.setdefault("bytes", len(payload))
+            return result
+        except urllib.error.HTTPError as e:
+            self._print_transport_error("POST", url, e)
+            error_fallback = {
+                "success": False,
+                "path": destination,
+                "bytes": len(payload),
+                "status": e.code,
+                "errorMessage": self._describe_transport_error(e),
+            }
+            result = self._decode_json_response_body(e.read(), error_fallback)
+            result.setdefault("success", False)
+            result.setdefault("path", destination)
+            result.setdefault("bytes", len(payload))
+            result.setdefault("status", e.code)
+            return result
+        except urllib.error.URLError as e:
+            self._print_transport_error("POST", url, e)
+            return None
+        except Exception as e:
+            print(f"POST {url} failed: {e}", file=sys.stderr)
+            return None
 
     def _get_raw(self, path: str, params: Dict = None) -> Optional[Dict]:
         """Send a GET request for endpoints such as /health, /screenshot, and /download."""

@@ -16,9 +16,10 @@ This document summarizes the permissions the Android REPL beta requests and why 
 - The service runs on the phone itself for this public beta. The local-first path avoids uploading UI data or screenshots to a cloud relay during normal use.
 - Because the public path is direct device-to-desktop communication, current control is limited to the same LAN. A later optional server-side path may expand that boundary.
 - If you enable a shared token on the phone, the `agent-android` CLI can send it via `--token YOUR_TOKEN`, the `AIVANE_API_TOKEN` environment variable, or `set token YOUR_TOKEN` inside the REPL.
+- File upload through `/upload` uses the same shared-token check. Treat it as a protected local developer convenience for syncing templates, images, and other ordinary files to phone-local storage.
 
 ## Security Notes
 
-- Only expose `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, `/download`, and the documented launcher endpoints. Do not forward requests beyond the documented surface. You can disable the REPL by stopping the phone-side service or killing the app.
+- Only expose `/execute`, `/health`, `/screenshot`, `/apps`, `/stop`, `/download`, `/upload`, and the documented launcher endpoints. Do not forward requests beyond the documented surface. You can disable the REPL by stopping the phone-side service or killing the app.
 
 

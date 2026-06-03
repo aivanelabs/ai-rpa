@@ -30,6 +30,7 @@ One-off examples:
     agent-android --tap 7 --url http://<device-ip>:8080
     agent-android --input 7 "hello world" --url http://<device-ip>:8080
     agent-android --template template.json --url http://<device-ip>:8080
+    agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
     agent-android --swipe up --url http://<device-ip>:8080
     agent-android --screenshot --url http://<device-ip>:8080
     agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
@@ -58,6 +59,7 @@ REPL quick reference:
     g <N> <attr>              Inspect an attribute for refId=N
     s [path]                  Capture screenshot
     ux [path] [--all]         Print or save the current UI tree XML
+    up <local> <path>         Upload a file to the phone (overwrites by default)
     la <pkg>                  Launch an app by package name
     p <key>                   Press a system key (back/home/recents)
     b                         Navigate back
@@ -104,6 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--tap", type=int, metavar="REFID", help="Tap element by refId")
     group.add_argument("--input", nargs=2, metavar=("REFID", "TEXT"), help="Input text to element by refId")
     group.add_argument("--template", metavar="TEMPLATE_JSON", help="Execute a template JSON file via /execute")
+    group.add_argument("--upload", metavar="LOCAL_FILE", help="Upload a local file to the phone via /upload")
     group.add_argument("--launch", "-a", type=str, metavar="PACKAGE", help="Launch app")
     group.add_argument("--health", action="store_true", help="Check service health from /health")
     group.add_argument("--back", action="store_true", help="Press back button")
@@ -129,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quality", "-q", type=int, default=80, help="Screenshot quality 1-100 (default: 80)")
     parser.add_argument("--match-index", type=int, help="Match index for --validate-xpath detail inspection")
     parser.add_argument("--ui-tree-all", action="store_true", help="Include off-screen nodes for --ui-tree")
+    parser.add_argument("--remote-path", metavar="REMOTE_PATH", help="Phone-side destination path for --upload")
+    parser.add_argument("--no-overwrite", action="store_true", help="For --upload, fail if the destination already exists")
     parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
@@ -172,8 +177,43 @@ def _split_ref_ids(value: str) -> List[str]:
     return [part for part in value.replace(",", " ").split() if part]
 
 
+def _response_succeeded(response: Dict[str, Any]) -> bool:
+    return response.get("success") is not False
+
+
+def _response_error_message(response: Dict[str, Any]) -> str:
+    for key in ("errorMessage", "message", "error"):
+        value = response.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return "Unknown error"
+
+
+def _format_upload_size(response: Dict[str, Any]) -> str:
+    size = response.get("bytes")
+    if isinstance(size, int):
+        return f"{size} bytes"
+    return "uploaded"
+
+
 def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -> None:
     session = _session_for_client(client, raw_output=args.raw, timeout=args.timeout)
+    if args.upload:
+        response = client.upload_file(
+            args.upload,
+            args.remote_path,
+            overwrite=not args.no_overwrite,
+        )
+        if response is None:
+            print("Failed to upload file. Check the connection hints above.", file=sys.stderr)
+            raise SystemExit(1)
+        if args.raw:
+            print(json.dumps(response, indent=2, ensure_ascii=False))
+        elif _response_succeeded(response):
+            print(f"Uploaded {args.upload} -> {args.remote_path} ({_format_upload_size(response)})")
+        else:
+            print(f"Upload failed: {_response_error_message(response)}", file=sys.stderr)
+        raise SystemExit(0 if _response_succeeded(response) else 1)
     if args.template:
         payload = _load_template_payload(args.template)
         response = client.execute_template_payload(payload)
@@ -338,6 +378,12 @@ def main() -> int:
         parser.error("--match-index requires --validate-xpath")
     if args.ui_tree_all and args.ui_tree is None:
         parser.error("--ui-tree-all requires --ui-tree")
+    if args.upload and not args.remote_path:
+        parser.error("--upload requires --remote-path")
+    if args.remote_path and not args.upload:
+        parser.error("--remote-path requires --upload")
+    if args.no_overwrite and not args.upload:
+        parser.error("--no-overwrite requires --upload")
     url = require_base_url(args.url)
     token = resolve_api_token(args.token)
 

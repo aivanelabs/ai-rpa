@@ -104,6 +104,16 @@ This is the shortest practical smoke flow after the phone is reachable:
 
 If you want the full setup path, see [docs/install-agent-android.md](docs/install-agent-android.md) and [docs/quickstart.md](docs/quickstart.md).
 
+## Template And File Sync
+
+Use the CLI upload command when you want to push a local template, image, or ordinary binary file from your computer to phone-local REPL storage:
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
+```
+
+Uploads overwrite by default. Add `--no-overwrite` to reject an existing target. In templates, use `http.download` when the phone should fetch and save an image, JSON template, zip, text file, or other binary file from a URL. Keep `http.get` for text or JSON responses that should be read into variables.
+
 ## What This Beta Is
 
 - Local-first Android automation over LAN

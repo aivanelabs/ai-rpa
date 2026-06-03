@@ -32,6 +32,15 @@ For prepared multi-step flows:
 agent-android --template template.json --url http://<device-ip>:8080
 ```
 
+For syncing templates, images, or other files from your computer to the phone:
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
+agent-android --upload foo.json --remote-path Templates/foo.json --no-overwrite --url http://<device-ip>:8080
+```
+
+`--upload` overwrites by default. It uses the same phone-side token check as the other protected REPL endpoints.
+
 ## Package Layout
 
 - `pyproject.toml`: setuptools package metadata and console-script registration
