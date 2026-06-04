@@ -26,6 +26,7 @@ class AgentAndroidClient:
         self.base_url = trimmed.rstrip('/')
         self.token = token.strip() if isinstance(token, str) and token.strip() else None
         self.execute_url = f"{self.base_url}/execute"
+        self.execute_application_url = f"{self.base_url}/executeApplication"
         self._opener = _build_http_opener(self.base_url)
         self._local_tree: Optional[List[Dict]] = None  # In-process UI tree cache
         self._local_tree_visible_only = True
@@ -113,6 +114,87 @@ class AgentAndroidClient:
     def execute_template_payload(self, payload: Dict[str, Any]) -> Optional[Dict]:
         """Execute a raw template payload via /execute."""
         return self._api_call(payload)
+
+    def execute_application_bundle(
+        self,
+        local_path: str,
+        *,
+        main_template_file: Optional[str] = None,
+        application_id: Optional[str] = None,
+        variables: Optional[Dict[str, Any]] = None,
+        timeout: int = 600,
+    ) -> Optional[Dict[str, Any]]:
+        """Execute a zipped application bundle via /executeApplication."""
+        try:
+            source_path = Path(local_path).expanduser()
+        except RuntimeError as exc:
+            print(f"Application bundle path is invalid: {exc}", file=sys.stderr)
+            return None
+
+        if not source_path.is_file():
+            print(f"Application bundle not found: {source_path}", file=sys.stderr)
+            return None
+
+        try:
+            payload = source_path.read_bytes()
+        except OSError as exc:
+            print(f"Failed to read application bundle {source_path}: {exc}", file=sys.stderr)
+            return None
+
+        params: Dict[str, str] = {}
+        if main_template_file:
+            params["mainTemplateFile"] = main_template_file
+        if application_id:
+            params["applicationId"] = application_id
+        if variables:
+            params["variables"] = json.dumps(variables, ensure_ascii=False, separators=(",", ":"))
+
+        url = self.execute_application_url
+        if params:
+            url += "?" + urllib.parse.urlencode(params)
+
+        fallback: Dict[str, Any] = {
+            "success": True,
+            "bundle": str(source_path),
+            "bytes": len(payload),
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers=self._build_headers(
+                    content_type="application/zip",
+                    user_agent="agent-android/0.1",
+                ),
+                method="POST",
+            )
+            with self._opener.open(req, timeout=timeout) as response:
+                result = self._decode_json_response_body(response.read(), fallback)
+            result.setdefault("success", True)
+            result.setdefault("bundle", str(source_path))
+            result.setdefault("bytes", len(payload))
+            return result
+        except urllib.error.HTTPError as e:
+            self._print_transport_error("POST", url, e)
+            error_fallback = {
+                "success": False,
+                "bundle": str(source_path),
+                "bytes": len(payload),
+                "status": e.code,
+                "errorMessage": self._describe_transport_error(e),
+            }
+            result = self._decode_json_response_body(e.read(), error_fallback)
+            result.setdefault("success", False)
+            result.setdefault("bundle", str(source_path))
+            result.setdefault("bytes", len(payload))
+            result.setdefault("status", e.code)
+            return result
+        except urllib.error.URLError as e:
+            self._print_transport_error("POST", url, e)
+            return None
+        except Exception as e:
+            print(f"POST {url} failed: {e}", file=sys.stderr)
+            return None
 
     def upload_file(
         self,

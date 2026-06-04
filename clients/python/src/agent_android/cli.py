@@ -30,6 +30,7 @@ One-off examples:
     agent-android --tap 7 --url http://<device-ip>:8080
     agent-android --input 7 "hello world" --url http://<device-ip>:8080
     agent-android --template template.json --url http://<device-ip>:8080
+    agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
     agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
     agent-android --swipe up --url http://<device-ip>:8080
     agent-android --screenshot --url http://<device-ip>:8080
@@ -106,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--tap", type=int, metavar="REFID", help="Tap element by refId")
     group.add_argument("--input", nargs=2, metavar=("REFID", "TEXT"), help="Input text to element by refId")
     group.add_argument("--template", metavar="TEMPLATE_JSON", help="Execute a template JSON file via /execute")
+    group.add_argument("--application-bundle", metavar="APPLICATION_ZIP", help="Execute a zipped application template bundle via /executeApplication")
     group.add_argument("--upload", metavar="LOCAL_FILE", help="Upload a local file to the phone via /upload")
     group.add_argument("--launch", "-a", type=str, metavar="PACKAGE", help="Launch app")
     group.add_argument("--health", action="store_true", help="Check service health from /health")
@@ -134,6 +136,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ui-tree-all", action="store_true", help="Include off-screen nodes for --ui-tree")
     parser.add_argument("--remote-path", metavar="REMOTE_PATH", help="Phone-side destination path for --upload")
     parser.add_argument("--no-overwrite", action="store_true", help="For --upload, fail if the destination already exists")
+    parser.add_argument("--main-template-file", metavar="TEMPLATE_JSON", help="Main template file, template id, or base name for --application-bundle")
+    parser.add_argument("--application-id", metavar="APPLICATION_ID", help="Application id override for --application-bundle")
+    parser.add_argument("--variables", metavar="JSON_OBJECT", help="Input variables JSON object for --application-bundle")
+    parser.add_argument("--execute-timeout", type=int, default=600, help="HTTP timeout in seconds for --application-bundle (default: 600)")
     parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
@@ -152,6 +158,20 @@ def _load_template_payload(path_str: str) -> Dict[str, Any]:
     except json.JSONDecodeError as exc:
         print(f"Template JSON is invalid: {exc}", file=sys.stderr)
         raise SystemExit(1)
+
+
+def _load_variables_payload(value: Optional[str]) -> Dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        print(f"Variables JSON is invalid: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(payload, dict):
+        print("Variables JSON must be an object", file=sys.stderr)
+        raise SystemExit(1)
+    return payload
 
 
 def _session_for_client(
@@ -198,6 +218,20 @@ def _format_upload_size(response: Dict[str, Any]) -> str:
 
 def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -> None:
     session = _session_for_client(client, raw_output=args.raw, timeout=args.timeout)
+    if args.application_bundle:
+        variables = _load_variables_payload(args.variables)
+        response = client.execute_application_bundle(
+            args.application_bundle,
+            main_template_file=args.main_template_file,
+            application_id=args.application_id,
+            variables=variables,
+            timeout=args.execute_timeout,
+        )
+        if response is None:
+            print("Failed to execute application bundle. Check the connection hints above.", file=sys.stderr)
+            raise SystemExit(1)
+        print(json.dumps(response, indent=2, ensure_ascii=False))
+        raise SystemExit(0 if response.get("success") is True else 1)
     if args.upload:
         response = client.upload_file(
             args.upload,
@@ -384,6 +418,14 @@ def main() -> int:
         parser.error("--remote-path requires --upload")
     if args.no_overwrite and not args.upload:
         parser.error("--no-overwrite requires --upload")
+    if args.main_template_file and not args.application_bundle:
+        parser.error("--main-template-file requires --application-bundle")
+    if args.application_id and not args.application_bundle:
+        parser.error("--application-id requires --application-bundle")
+    if args.variables and not args.application_bundle:
+        parser.error("--variables requires --application-bundle")
+    if args.execute_timeout <= 0:
+        parser.error("--execute-timeout must be positive")
     url = require_base_url(args.url)
     token = resolve_api_token(args.token)
 

@@ -168,6 +168,49 @@ def test_upload_file_posts_raw_body_with_token(monkeypatch, tmp_path):
     assert captured["timeout"] == 60
 
 
+def test_execute_application_bundle_posts_zip_with_metadata(monkeypatch, tmp_path):
+    captured = {}
+    bundle = tmp_path / "app.zip"
+    bundle.write_bytes(b"zip-bytes")
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **kwargs):
+            parsed = urllib.parse.urlparse(request.full_url)
+            query = urllib.parse.parse_qs(parsed.query)
+            headers = {key.lower(): value for key, value in request.header_items()}
+            captured["path"] = parsed.path
+            captured["query"] = query
+            captured["method"] = request.get_method()
+            captured["body"] = request.data
+            captured["headers"] = headers
+            captured["timeout"] = kwargs.get("timeout")
+            return _FakeResponse(b'{"success": true, "data": {"templateId": "main"}}')
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
+
+    result = token_client.execute_application_bundle(
+        str(bundle),
+        main_template_file="xhs-complaint-full.json",
+        application_id="xhs-complaint",
+        variables={"keyword": "demo"},
+        timeout=123,
+    )
+
+    assert result == {"success": True, "data": {"templateId": "main"}, "bundle": str(bundle), "bytes": 9}
+    assert captured["path"] == "/executeApplication"
+    assert captured["query"] == {
+        "mainTemplateFile": ["xhs-complaint-full.json"],
+        "applicationId": ["xhs-complaint"],
+        "variables": ['{"keyword":"demo"}'],
+    }
+    assert captured["method"] == "POST"
+    assert captured["body"] == b"zip-bytes"
+    assert captured["headers"]["x-api-token"] == "shared-secret"
+    assert captured["headers"]["content-type"] == "application/zip"
+    assert captured["timeout"] == 123
+
+
 def test_upload_file_defaults_to_overwrite_true(monkeypatch, tmp_path):
     captured = {}
     source = tmp_path / "image.png"

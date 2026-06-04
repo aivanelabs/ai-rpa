@@ -32,6 +32,12 @@ For prepared multi-step flows:
 agent-android --template template.json --url http://<device-ip>:8080
 ```
 
+For a workflow bundle with one main template plus child templates:
+
+```bash
+agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
 For syncing templates, images, or other files from your computer to the phone:
 
 ```bash

@@ -99,9 +99,15 @@ agent-android --input <refId> "hello" --url http://<device-ip>:8080
 agent-android --back --url http://<device-ip>:8080
 ```
 
-## Sync Templates Or Files
+## Run Template Bundles Or Sync Files
 
-To push a frequently edited sub-template, image, or ordinary binary file from the desktop to the phone:
+For a workflow made of one main template plus child templates, zip the folder and execute it as an application bundle:
+
+```bash
+agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
+To push a standalone image, ordinary binary file, or one-off local file from the desktop to the phone:
 
 ```bash
 agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
@@ -113,7 +119,7 @@ agent-android --upload foo.json --remote-path Templates/foo.json --url http://<d
 agent-android --upload foo.json --remote-path Templates/foo.json --no-overwrite --url http://<device-ip>:8080
 ```
 
-After uploading `Templates/<templateId>.json`, run the main template with `--template`; phone-side `template.execute` can then resolve the updated sub-template from the local repository. If a template needs the phone itself to fetch a file from a URL, use `http.download` for images, zip files, JSON templates, text files, or other binary content. Keep `http.get` for text or JSON responses that should be read into variables.
+If a template needs the phone itself to fetch a file from a URL, use `http.download` for images, zip files, JSON templates, text files, or other binary content. Keep `http.get` for text or JSON responses that should be read into variables.
 
 ## Notes
 
