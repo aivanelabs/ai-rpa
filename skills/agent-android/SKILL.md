@@ -84,6 +84,7 @@ Actions:
 - `agent-android --back --url http://<device-ip>:8080`
 - `agent-android --press home --url http://<device-ip>:8080`
 - `agent-android --screenshot --url http://<device-ip>:8080`
+- `agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080`
 - `agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080`
 
 Waiting and output:
@@ -197,11 +198,11 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
 - `ix //EditText[@text='Search'] --`
 - `ix //EditText[@text='Search'] -- hello world`
 
-### Sync a sub-template before execution
+### Run a local template bundle
 
-- `agent-android --upload child.json --remote-path Templates/child.json --url http://<device-ip>:8080`
-- `agent-android --template main.json --url http://<device-ip>:8080`
-- Use `--no-overwrite` only when preserving an existing phone-side file matters.
+- Zip the local folder containing the main template and child templates.
+- Run `agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080`.
+- Use `--upload` only for standalone images, ordinary binary files, or one-off file sync.
 
 ## Troubleshooting
 

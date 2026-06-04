@@ -236,6 +236,108 @@ def test_main_template_reports_missing_file(monkeypatch, capsys):
     assert "Template file not found:" in captured.err
 
 
+def test_main_application_bundle_executes_zip_and_prints_response(monkeypatch, tmp_path, capsys):
+    seen = {}
+    bundle_path = tmp_path / "app.zip"
+    bundle_path.write_bytes(b"zip")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            seen["url"] = url
+            seen["token"] = token
+            self.base_url = url
+
+        def execute_application_bundle(
+            self,
+            local_path,
+            *,
+            main_template_file=None,
+            application_id=None,
+            variables=None,
+            timeout=600,
+        ):
+            seen["bundle"] = {
+                "local_path": local_path,
+                "main_template_file": main_template_file,
+                "application_id": application_id,
+                "variables": variables,
+                "timeout": timeout,
+            }
+            return {"success": True, "data": {"templateId": "xhs-user-complaint"}}
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--token",
+            "shared-secret",
+            "--application-bundle",
+            str(bundle_path),
+            "--main-template-file",
+            "xhs-complaint-full.json",
+            "--application-id",
+            "xhs-complaint",
+            "--variables",
+            '{"keyword":"demo"}',
+            "--execute-timeout",
+            "123",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert seen == {
+        "url": "http://device:8080",
+        "token": "shared-secret",
+        "bundle": {
+            "local_path": str(bundle_path),
+            "main_template_file": "xhs-complaint-full.json",
+            "application_id": "xhs-complaint",
+            "variables": {"keyword": "demo"},
+            "timeout": 123,
+        },
+    }
+    assert json.loads(captured.out) == {"success": True, "data": {"templateId": "xhs-user-complaint"}}
+
+
+def test_main_application_bundle_reports_invalid_variables_json(monkeypatch, tmp_path, capsys):
+    bundle_path = tmp_path / "app.zip"
+    bundle_path.write_bytes(b"zip")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--application-bundle",
+            str(bundle_path),
+            "--variables",
+            "not-json",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 1
+    assert "Variables JSON is invalid:" in captured.err
+
+
 def test_main_upload_passes_default_overwrite_true(monkeypatch, tmp_path, capsys):
     seen = {}
     source = tmp_path / "foo.json"

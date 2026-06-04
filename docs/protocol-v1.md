@@ -20,6 +20,12 @@ This document outlines the public-facing protocol surface for the first AIVane A
   - `path` may be absolute or relative to the app external files directory
   - `overwrite` defaults to `true`; set `overwrite=false` to reject existing targets
   - Uses the same shared-token check as the protected REPL endpoints
+- `POST /executeApplication`
+  - Upload and execute a zipped application template bundle
+  - Use this for local workflows that have one main template plus child templates
+  - Child template resolution is scoped to the uploaded bundle to avoid phone-local name collisions
+  - Optional query/form parameters include `mainTemplateFile`, `applicationId`, and `variables`
+  - Uses the same shared-token check as the protected REPL endpoints
 
 ## Advanced / Compatibility Endpoint
 
@@ -52,14 +58,15 @@ Public story:
 Compatibility story:
 
 - Advanced users can still execute prepared multi-step templates
-- Files can be synced first with `/upload`, then consumed by templates through the phone-side repository or file operations
+- Template bundles can be executed directly with `/executeApplication`
+- Standalone files can be synced with `/upload`, then consumed by templates through file operations
 
 ## Security
 
 - LAN usage only
 - Optional shared token
 - Client transport can send the token through the `x-api-token` header
-- `/upload` is not a public unauthenticated file drop; protect it with the same token configuration used for the rest of the REPL service
+- `/upload` and `/executeApplication` are not public unauthenticated file drops; protect them with the same token configuration used for the rest of the REPL service
 - Visible service state and stop controls
 
 This protocol will continue to be refined as the public beta evolves.

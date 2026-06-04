@@ -106,7 +106,13 @@ If you want the full setup path, see [docs/install-agent-android.md](docs/instal
 
 ## Template And File Sync
 
-Use the CLI upload command when you want to push a local template, image, or ordinary binary file from your computer to phone-local REPL storage:
+Use an application bundle when a workflow has one main template plus child templates. The phone executes the zip as one scoped package, so child template names do not collide with phone-local templates:
+
+```bash
+agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
+Use the CLI upload command when you want to push a standalone image, ordinary binary file, or one-off local file from your computer to phone-local REPL storage:
 
 ```bash
 agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080

@@ -104,7 +104,13 @@ Use the installed agent-android skill to:
 
 ## 模板和文件同步
 
-如果你想把电脑上的子模板、图片或普通二进制文件推送到手机端 REPL 可访问的本地路径，可以用 CLI 上传：
+如果一个工作流包含一个主模板和多个子模板，优先把目录打成 zip 后作为应用包执行。手机会在这个 zip 的作用域内解析子模板，避免和手机本地同名模板冲突：
+
+```bash
+agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
+如果你想把单独的图片、普通二进制文件或一次性本地文件推送到手机端 REPL 可访问的本地路径，可以用 CLI 上传：
 
 ```bash
 agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
