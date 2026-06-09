@@ -14,6 +14,9 @@ class _DummyClient:
         self._local_tree = None
         self.input_calls = []
         self.input_xpath_calls = []
+        self.swipe_calls = []
+        self.swipe_element_calls = []
+        self.swipe_xpath_calls = []
         self.pressed_keys = []
         self.upload_calls = []
 
@@ -126,6 +129,18 @@ class _DummyClient:
         self.input_xpath_calls.append((xpath, text))
         return True
 
+    def swipe(self, direction, duration=300, distance=0.5):
+        self.swipe_calls.append((direction, duration, distance))
+        return True
+
+    def swipe_element(self, ref_id, direction, duration=300, distance=0.5):
+        self.swipe_element_calls.append((ref_id, direction, duration, distance))
+        return True
+
+    def swipe_by_xpath(self, xpath, direction, duration=300, distance=0.5):
+        self.swipe_xpath_calls.append((xpath, direction, duration, distance))
+        return True
+
     def press_key(self, key):
         self.pressed_keys.append(key)
         return True
@@ -181,6 +196,13 @@ def test_parse_line_keeps_validatenodes_xpath_with_spaces_inside_predicate(sessi
 
     assert command == "vn"
     assert args == ["/hierarchy/RecyclerView[1]/FrameLayout[position()=1 or position()=2]"]
+
+
+def test_parse_line_keeps_swipex_xpath_and_options_together(session):
+    command, args = session._parse_line("swx u //node[@text='Hello world'] --dur 500")
+
+    assert command == "swx"
+    assert args == ["u", "//node[@text='Hello world'] --dur 500"]
 
 
 def test_parse_line_uses_shell_style_splitting_for_regular_commands(session):
@@ -290,6 +312,30 @@ def test_cmd_inputx_supports_empty_text_via_delimiter(session):
     assert session._cmd_inputx(["//EditText[@text='Search']", ""]) is True
 
     assert session.client.input_xpath_calls == [("//EditText[@text='Search']", "")]
+
+
+def test_cmd_swipe_supports_screen_swipe(session):
+    assert session._cmd_swipe(["d", "--dur", "450", "--dist", "0.75"]) is True
+
+    assert session.client.swipe_calls == [("down", 450, 0.75)]
+
+
+def test_cmd_swipe_supports_refid_target(session):
+    assert session._cmd_swipe(["u", "5", "--dur", "450", "--dist", "0.75"]) is True
+
+    assert session.client.swipe_element_calls == [(5, "up", 450, 0.75)]
+
+
+def test_cmd_swipe_supports_refid_flag(session):
+    assert session._cmd_swipe(["left", "--refId", "6"]) is True
+
+    assert session.client.swipe_element_calls == [(6, "left", 300, 0.5)]
+
+
+def test_cmd_swipex_supports_xpath_target_with_options(session):
+    assert session._cmd_swipex(["u", "//node[@text='Hello world'] --dur 500 --dist 0.8"]) is True
+
+    assert session.client.swipe_xpath_calls == [("//node[@text='Hello world']", "up", 500, 0.8)]
 
 
 def test_cmd_validatex_prints_requested_match_detail(session, capsys):
@@ -484,6 +530,8 @@ def test_help_text_matches_current_xpath_and_press_usage(session, capsys):
     assert "vn <xpath>" in captured.out
     assert "ux [path] [--all]" in captured.out
     assert "up <local> <path>" in captured.out
+    assert "sw <d|u|l|r> [refId]" in captured.out
+    assert "swx <d|u|l|r> <xpath>" in captured.out
     assert "x <N>" not in captured.out
     assert "p <key>           Press a key (back/home/recents)" in captured.out
     assert "Press a key (back/home/menu/enter/delete/power)" not in captured.out

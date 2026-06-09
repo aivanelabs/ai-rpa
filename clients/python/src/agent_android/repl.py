@@ -41,6 +41,8 @@ class AriaReplSession:
       up foo.json Templates/foo.json --no-overwrite -> refuse to overwrite
       sw d                 -> swipe down (down/up/left/right)
       sw d --dur 500 --dist 0.7  -> swipe down for 500ms at distance 0.7
+      sw u 5               -> swipe up inside refId=5
+      swx u //RecyclerView[1] -> swipe up inside an XPath element
       wf Search            -> wait for a "Search" element (default 30s)
       wf Search --t 60     -> wait up to 60s
       g 5 text             -> get the text attribute for refId=5
@@ -78,6 +80,7 @@ class AriaReplSession:
         ('i', 'input',         'Input text (refId text)'),
         ('ix', 'inputx',       'Input text by XPath'),
         ('sw', 'swipe',        'Swipe (d/u/l/r)'),
+        ('swx', 'swipex',      'Swipe an element by XPath'),
         ('p', 'press',         'Press a key (back/home/recents)'),
         ('b', 'back',          'Press Back'),
         ('wf', 'waitfor',      'Wait for an element to appear'),
@@ -207,6 +210,14 @@ class AriaReplSession:
 
         if cmd in ('ix', 'inputx'):
             return cmd, self._parse_xpath_input_args(remainder)
+
+        if cmd in ('swx', 'swipex'):
+            direction, _, xpath_and_options = remainder.partition(' ')
+            if not direction:
+                return cmd, []
+            if not xpath_and_options.strip():
+                return cmd, [direction]
+            return cmd, [direction, xpath_and_options.strip()]
 
         if cmd in ('i', 'input'):
             return cmd, self._parse_ref_input_args(remainder)
@@ -934,33 +945,100 @@ class AriaReplSession:
     def _cmd_ix(self, args: List[str]) -> bool:
         return self._cmd_inputx(args)
 
-    def _cmd_swipe(self, args: List[str]) -> bool:
-        """sw <d|u|l|r> [--dur N] [--dist N] - swipe."""
-        if not args or args[0] not in ('d', 'u', 'l', 'r',
-                                          'down', 'up', 'left', 'right'):
-            self._print_error("Usage: sw <d|u|l|r> [--dur N] [--dist N]")
-            return False
+    def _parse_swipe_direction(self, value: str) -> Optional[str]:
         direction_map = {'d': 'down', 'u': 'up', 'l': 'left', 'r': 'right'}
-        direction = direction_map.get(args[0], args[0])
+        direction = direction_map.get(value, value)
+        return direction if direction in ('down', 'up', 'left', 'right') else None
 
+    def _parse_swipe_options(
+        self,
+        args: List[str],
+        usage: str,
+    ) -> Optional[Tuple[int, float, Optional[int]]]:
         duration = 300
         distance = 0.5
-        i = 1
-        while i < len(args):
-            if args[i] == '--dur' and i + 1 < len(args):
-                duration = int(args[i + 1]); i += 2
-            elif args[i] == '--dist' and i + 1 < len(args):
-                distance = float(args[i + 1]); i += 2
-            else:
-                i += 1
+        ref_id: Optional[int] = None
+        i = 0
+        try:
+            while i < len(args):
+                if args[i] in ('--dur', '--duration') and i + 1 < len(args):
+                    duration = int(args[i + 1]); i += 2
+                elif args[i] in ('--dist', '--distance') and i + 1 < len(args):
+                    distance = float(args[i + 1]); i += 2
+                elif args[i] in ('--ref', '--refId', '--refid') and i + 1 < len(args):
+                    if not args[i + 1].isdigit():
+                        self._print_error(usage)
+                        return None
+                    ref_id = int(args[i + 1]); i += 2
+                elif ref_id is None and args[i].isdigit():
+                    ref_id = int(args[i]); i += 1
+                else:
+                    i += 1
+        except ValueError:
+            self._print_error(usage)
+            return None
+        return duration, distance, ref_id
 
-        ok = self.client.swipe(direction, duration, distance)
+    def _cmd_swipe(self, args: List[str]) -> bool:
+        """sw <d|u|l|r> [refId|--refId N] [--dur N] [--dist N] - swipe."""
+        usage = "Usage: sw <d|u|l|r> [refId|--refId N] [--dur N] [--dist N]"
+        if not args:
+            self._print_error(usage)
+            return False
+        direction = self._parse_swipe_direction(args[0])
+        if direction is None:
+            self._print_error(usage)
+            return False
+
+        parsed = self._parse_swipe_options(args[1:], usage)
+        if parsed is None:
+            return False
+        duration, distance, ref_id = parsed
+
+        if ref_id is not None:
+            ok = self.client.swipe_element(ref_id, direction, duration, distance)
+        else:
+            ok = self.client.swipe(direction, duration, distance)
         if ok:
             self._invalidate_tree()
         return ok
 
     def _cmd_sw(self, args: List[str]) -> bool:
         return self._cmd_swipe(args)
+
+    def _cmd_swipex(self, args: List[str]) -> bool:
+        """swx <d|u|l|r> <xpath> [--dur N] [--dist N] - swipe by XPath."""
+        usage = "Usage: swx <d|u|l|r> <xpath> [--dur N] [--dist N]"
+        if len(args) < 2:
+            self._print_error(usage)
+            self._print_error("  Example: swx u //RecyclerView[1]")
+            return False
+        direction = self._parse_swipe_direction(args[0])
+        if direction is None:
+            self._print_error(usage)
+            return False
+
+        xpath, option_text = self._split_xpath_expression(' '.join(args[1:]))
+        if not xpath:
+            self._print_error(usage)
+            return False
+        try:
+            option_args = shlex.split(option_text, posix=False) if option_text else []
+        except ValueError:
+            self._print_error(usage)
+            return False
+        parsed = self._parse_swipe_options(option_args, usage)
+        if parsed is None:
+            return False
+        duration, distance, _ref_id = parsed
+
+        ok = self.client.swipe_by_xpath(xpath, direction, duration, distance)
+        if ok:
+            self._invalidate_tree()
+        return ok
+
+    def _cmd_swx(self, args: List[str]) -> bool:
+        return self._cmd_swipex(args)
 
     def _cmd_press(self, args: List[str]) -> bool:
         """p <key> - press a key (back/home/recents)."""
@@ -1278,8 +1356,10 @@ class AriaReplSession:
             "    ix <xpath> <text> Input text by XPath",
             "                       Use '--clear' or 'ix <xpath> --' to clear the field",
             "                       Example: ix //EditText[@text='Search'] hello",
-            "    sw <d|u|l|r> [--dur N] [--dist N]",
-            "                       Swipe (d=down, u=up, l=left, r=right)",
+            "    sw <d|u|l|r> [refId] [--dur N] [--dist N]",
+            "                       Swipe the screen, or swipe inside refId when provided",
+            "    swx <d|u|l|r> <xpath> [--dur N] [--dist N]",
+            "                       Swipe inside an XPath element",
             "    p <key>           Press a key (back/home/recents)",
             "    b                  Press Back",
             "",
@@ -1309,7 +1389,7 @@ class AriaReplSession:
             "    h                  Show this help",
             "",
             "  Shortcuts: l->list, ss->snapshot, t->tap, tx->tapx, xx->tapx-auto,",
-            "              i->input, ix->inputx, sw->swipe, p->press, b->back,",
+            "              i->input, ix->inputx, sw->swipe, swx->swipex, p->press, b->back,",
             "              wf->waitfor, g->get, s->screenshot, ux->uitree, up->upload, la->launch, hl->health, vx->validatex,",
             "              mx->multixpath,",
             "              ref->ref, node->node, x->xpath, vn->validatenodes, f->find, h->help, q->quit",
