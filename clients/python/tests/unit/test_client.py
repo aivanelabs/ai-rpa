@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import urllib.error
 import urllib.parse
 
@@ -135,6 +136,42 @@ def test_api_call_sends_token_header(monkeypatch):
     }
 
 
+def test_execute_template_payload_can_submit_async(monkeypatch):
+    captured = {}
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **kwargs):
+            parsed = urllib.parse.urlparse(request.full_url)
+            headers = {key.lower(): value for key, value in request.header_items()}
+            captured["path"] = parsed.path
+            captured["query"] = urllib.parse.parse_qs(parsed.query)
+            captured["method"] = request.get_method()
+            captured["body"] = request.data
+            captured["headers"] = headers
+            captured["timeout"] = kwargs.get("timeout")
+            return _FakeResponse(
+                b'{"success": true, "accepted": true, "taskId": "task-1", "status": "pending"}'
+            )
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
+
+    result = token_client.execute_template_payload(
+        {"templateId": "smoke", "operations": []},
+        async_execution=True,
+        timeout=12,
+    )
+
+    assert result == {"success": True, "accepted": True, "taskId": "task-1", "status": "pending"}
+    assert captured["path"] == "/execute"
+    assert captured["query"] == {"async": ["true"]}
+    assert captured["method"] == "POST"
+    assert json.loads(captured["body"].decode("utf-8")) == {"templateId": "smoke", "operations": []}
+    assert captured["headers"]["x-api-token"] == "shared-secret"
+    assert captured["headers"]["content-type"] == "application/json"
+    assert captured["timeout"] == 12
+
+
 def test_upload_file_posts_raw_body_with_token(monkeypatch, tmp_path):
     captured = {}
     source = tmp_path / "foo.json"
@@ -209,6 +246,89 @@ def test_execute_application_bundle_posts_zip_with_metadata(monkeypatch, tmp_pat
     assert captured["headers"]["x-api-token"] == "shared-secret"
     assert captured["headers"]["content-type"] == "application/zip"
     assert captured["timeout"] == 123
+
+
+def test_execute_application_bundle_can_submit_async(monkeypatch, tmp_path):
+    captured = {}
+    bundle = tmp_path / "app.zip"
+    bundle.write_bytes(b"zip-bytes")
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **_kwargs):
+            parsed = urllib.parse.urlparse(request.full_url)
+            captured["path"] = parsed.path
+            captured["query"] = urllib.parse.parse_qs(parsed.query)
+            captured["body"] = request.data
+            return _FakeResponse(
+                b'{"success": true, "accepted": true, "taskId": "task-2", "status": "pending"}'
+            )
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    async_client = client_module.AgentAndroidClient("http://device:8080")
+
+    result = async_client.execute_application_bundle(
+        str(bundle),
+        main_template_file="main.json",
+        async_execution=True,
+    )
+
+    assert result == {
+        "success": True,
+        "accepted": True,
+        "taskId": "task-2",
+        "status": "pending",
+        "bundle": str(bundle),
+        "bytes": 9,
+    }
+    assert captured["path"] == "/executeApplication"
+    assert captured["query"] == {"mainTemplateFile": ["main.json"], "async": ["true"]}
+    assert captured["body"] == b"zip-bytes"
+
+
+def test_task_status_helpers_use_encoded_paths(client, monkeypatch):
+    calls = []
+
+    def fake_get_raw(path, params=None):
+        calls.append((path, params))
+        return {"path": path}
+
+    monkeypatch.setattr(client, "_get_raw", fake_get_raw)
+
+    assert client.list_tasks() == {"path": "/tasks"}
+    assert client.get_current_task() == {"path": "/tasks/current"}
+    assert client.get_task("task 1/2") == {"path": "/tasks/task%201%2F2"}
+    assert client.get_task_logs("task 1/2") == {"path": "/tasks/task%201%2F2/logs"}
+    assert calls == [
+        ("/tasks", None),
+        ("/tasks/current", None),
+        ("/tasks/task%201%2F2", None),
+        ("/tasks/task%201%2F2/logs", None),
+    ]
+
+
+def test_stop_task_posts_to_encoded_endpoint_with_token(monkeypatch):
+    captured = {}
+
+    class _RecordingOpener:
+        def open(self, request, *_args, **kwargs):
+            parsed = urllib.parse.urlparse(request.full_url)
+            headers = {key.lower(): value for key, value in request.header_items()}
+            captured["path"] = parsed.path
+            captured["method"] = request.get_method()
+            captured["body"] = request.data
+            captured["headers"] = headers
+            captured["timeout"] = kwargs.get("timeout")
+            return _FakeResponse(b'{"success": true, "status": "cancelled"}')
+
+    monkeypatch.setattr(client_module, "_build_http_opener", lambda _base_url: _RecordingOpener())
+    token_client = client_module.AgentAndroidClient("http://device:8080", token="shared-secret")
+
+    assert token_client.stop_task("task 1/2") == {"success": True, "status": "cancelled"}
+    assert captured["path"] == "/tasks/task%201%2F2/stop"
+    assert captured["method"] == "POST"
+    assert captured["body"] == b""
+    assert captured["headers"]["x-api-token"] == "shared-secret"
+    assert captured["timeout"] == 30
 
 
 def test_upload_file_defaults_to_overwrite_true(monkeypatch, tmp_path):

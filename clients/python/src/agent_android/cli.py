@@ -15,8 +15,8 @@ from .repl import AriaReplSession
 EPILOG = """AIVane Android REPL CLI helper for agent-android.
 
 The phone hosts the beta HTTP service locally and this client connects
-directly to http://<device-ip>:8080. The public path is local-first and
-does not require a cloud relay for the basic smoke flow.
+directly to the phone URL, usually http://<device-ip>:8080. The public path
+is local-first and does not require a cloud relay for the basic smoke flow.
 
 Quick start:
     agent-android --repl --url http://<device-ip>:8080
@@ -30,7 +30,9 @@ One-off examples:
     agent-android --tap 7 --url http://<device-ip>:8080
     agent-android --input 7 "hello world" --url http://<device-ip>:8080
     agent-android --template template.json --url http://<device-ip>:8080
+    agent-android --template template.json --async --url http://<device-ip>:8080
     agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+    agent-android --task TASK_ID --url http://<device-ip>:8080
     agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
     agent-android --swipe up --url http://<device-ip>:8080
     agent-android --screenshot --url http://<device-ip>:8080
@@ -108,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--input", nargs=2, metavar=("REFID", "TEXT"), help="Input text to element by refId")
     group.add_argument("--template", metavar="TEMPLATE_JSON", help="Execute a template JSON file via /execute")
     group.add_argument("--application-bundle", metavar="APPLICATION_ZIP", help="Execute a zipped application template bundle via /executeApplication")
+    group.add_argument("--tasks", action="store_true", help="List retained async REPL tasks from /tasks")
+    group.add_argument("--task", metavar="TASK_ID", help="Show async REPL task status from /tasks/TASK_ID")
+    group.add_argument("--current-task", action="store_true", help="Show the currently active async REPL task")
+    group.add_argument("--task-logs", metavar="TASK_ID", help="Show async REPL task logs from /tasks/TASK_ID/logs")
+    group.add_argument("--stop-task", metavar="TASK_ID", help="Stop one async REPL task via /tasks/TASK_ID/stop")
     group.add_argument("--upload", metavar="LOCAL_FILE", help="Upload a local file to the phone via /upload")
     group.add_argument("--launch", "-a", type=str, metavar="PACKAGE", help="Launch app")
     group.add_argument("--health", action="store_true", help="Check service health from /health")
@@ -139,7 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--main-template-file", metavar="TEMPLATE_JSON", help="Main template file, template id, or base name for --application-bundle")
     parser.add_argument("--application-id", metavar="APPLICATION_ID", help="Application id override for --application-bundle")
     parser.add_argument("--variables", metavar="JSON_OBJECT", help="Input variables JSON object for --application-bundle")
-    parser.add_argument("--execute-timeout", type=int, default=600, help="HTTP timeout in seconds for --application-bundle (default: 600)")
+    parser.add_argument("--async", dest="async_execution", action="store_true", help="Submit --template or --application-bundle as an async REPL task")
+    parser.add_argument("--execute-timeout", type=int, default=600, help="HTTP timeout in seconds for synchronous template/application execution (default: 600)")
     parser.add_argument("--filter", "-f", type=str, help="Filter elements by text or content description")
     parser.add_argument("--raw", action="store_true", help="Output raw JSON")
     parser.add_argument("--output", "-o", type=str, help="Save ARIA tree to JSON file")
@@ -216,8 +224,15 @@ def _format_upload_size(response: Dict[str, Any]) -> str:
     return "uploaded"
 
 
+def _exit_with_json_response(response: Optional[Dict[str, Any]], failure_message: str) -> None:
+    if response is None:
+        print(f"{failure_message}. Check the connection hints above.", file=sys.stderr)
+        raise SystemExit(1)
+    print(json.dumps(response, indent=2, ensure_ascii=False))
+    raise SystemExit(0 if _response_succeeded(response) else 1)
+
+
 def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -> None:
-    session = _session_for_client(client, raw_output=args.raw, timeout=args.timeout)
     if args.application_bundle:
         variables = _load_variables_payload(args.variables)
         response = client.execute_application_bundle(
@@ -225,13 +240,10 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
             main_template_file=args.main_template_file,
             application_id=args.application_id,
             variables=variables,
+            async_execution=args.async_execution,
             timeout=args.execute_timeout,
         )
-        if response is None:
-            print("Failed to execute application bundle. Check the connection hints above.", file=sys.stderr)
-            raise SystemExit(1)
-        print(json.dumps(response, indent=2, ensure_ascii=False))
-        raise SystemExit(0 if response.get("success") is True else 1)
+        _exit_with_json_response(response, "Failed to execute application bundle")
     if args.upload:
         response = client.upload_file(
             args.upload,
@@ -250,12 +262,24 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
         raise SystemExit(0 if _response_succeeded(response) else 1)
     if args.template:
         payload = _load_template_payload(args.template)
-        response = client.execute_template_payload(payload)
-        if response is None:
-            print("Failed to execute template payload. Check the connection hints above.", file=sys.stderr)
-            raise SystemExit(1)
-        print(json.dumps(response, indent=2, ensure_ascii=False))
-        raise SystemExit(0 if response.get("success") is True else 1)
+        response = client.execute_template_payload(
+            payload,
+            async_execution=args.async_execution,
+            timeout=args.execute_timeout,
+        )
+        _exit_with_json_response(response, "Failed to execute template payload")
+    if args.tasks:
+        _exit_with_json_response(client.list_tasks(), "Failed to list async tasks")
+    if args.task:
+        _exit_with_json_response(client.get_task(args.task), "Failed to get async task")
+    if args.current_task:
+        _exit_with_json_response(client.get_current_task(), "Failed to get current async task")
+    if args.task_logs:
+        _exit_with_json_response(client.get_task_logs(args.task_logs), "Failed to get async task logs")
+    if args.stop_task:
+        _exit_with_json_response(client.stop_task(args.stop_task), "Failed to stop async task")
+
+    session = _session_for_client(client, raw_output=args.raw, timeout=args.timeout)
     if args.health:
         session._raw_output = True
         _exit_with_repl_result(session._cmd_health([]))
@@ -424,6 +448,8 @@ def main() -> int:
         parser.error("--application-id requires --application-bundle")
     if args.variables and not args.application_bundle:
         parser.error("--variables requires --application-bundle")
+    if args.async_execution and not (args.template or args.application_bundle):
+        parser.error("--async requires --template or --application-bundle")
     if args.execute_timeout <= 0:
         parser.error("--execute-timeout must be positive")
     url = require_base_url(args.url)

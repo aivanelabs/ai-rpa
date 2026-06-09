@@ -5,7 +5,7 @@ This document outlines the public-facing protocol surface for the first AIVane A
 ## Core Endpoints
 
 - `GET /health`
-  - Basic service diagnostics and permission readiness (`permissions.accessibilityEnabled`, `permissions.overlayPermissionGranted`, `permissions.screenshotPermissionGranted`)
+  - Basic service diagnostics, REPL app version (`version`), configured address/port, and permission readiness (`permissions.accessibilityEnabled`, `permissions.overlayPermissionGranted`, `permissions.screenshotPermissionGranted`)
 - `GET /apps`
   - List launchable apps
 - `POST /stop`

@@ -12,12 +12,12 @@ Runtime prerequisites:
 
 - `agent-android` is available on `PATH`
 - if it is missing, install the CLI with `uv tool install aivane-agent-android`; then run `uv tool update-shell` if the command is still not found
-- the user has provided a trusted device URL such as `http://<device-ip>:8080`
+- the user has provided a trusted device URL such as `http://<device-ip>:8080`; use the phone-side configured port if it is not `8080`
 
 The public path is local-first:
 
 - the phone hosts the lightweight HTTP service locally
-- the desktop connects directly to `http://<device-ip>:8080`
+- the desktop connects directly to the phone URL, usually `http://<device-ip>:8080`
 - UI reads, taps, inputs, and screenshots stay on the phone and controlling machine
 - the current tradeoff is LAN-only control; an optional server-side or relay path may arrive later
 
@@ -85,12 +85,18 @@ Actions:
 - `agent-android --press home --url http://<device-ip>:8080`
 - `agent-android --screenshot --url http://<device-ip>:8080`
 - `agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080`
+- `agent-android --template template.json --async --url http://<device-ip>:8080`
+- `agent-android --application-bundle app.zip --main-template-file __main__.json --async --url http://<device-ip>:8080`
 - `agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080`
 
 Waiting and output:
 
 - `agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080`
 - `agent-android --list --raw --url http://<device-ip>:8080`
+- `agent-android --tasks --url http://<device-ip>:8080`
+- `agent-android --task TASK_ID --url http://<device-ip>:8080`
+- `agent-android --task-logs TASK_ID --url http://<device-ip>:8080`
+- `agent-android --stop-task TASK_ID --url http://<device-ip>:8080`
 
 ## REPL Command Reference
 

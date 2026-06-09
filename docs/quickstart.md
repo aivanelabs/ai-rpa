@@ -7,12 +7,12 @@ This quickstart introduces the public GitHub beta for AIVane (AI Mobile Automati
 - An Android device with the AIVane REPL beta APK installed
 - A desktop or laptop on the same LAN
 - Python 3.9+
-- `curl` or a browser to test `http://<device-ip>:8080/health`
+- `curl` or a browser to test `http://<device-ip>:8080/health` unless you changed the phone-side REPL port
 
 ## Why The Phone Hosts The Service
 
 - The beta starts a lightweight HTTP service on the phone itself.
-- The desktop talks directly to `http://<device-ip>:8080`, so the full smoke flow runs locally.
+- The desktop talks directly to the phone URL, usually `http://<device-ip>:8080`, so the full smoke flow runs locally.
 - UI reads, taps, inputs, and screenshots are not uploaded to a cloud service as part of this public path.
 - The tradeoff is that the first public build is LAN-only. A later optional server-side or relay path is under consideration for scenarios that need control beyond the local network.
 
@@ -24,7 +24,7 @@ Before you open the desktop CLI, make sure the phone is actually ready:
 2. Enable the AIVane accessibility service if Android prompts for it.
 3. Keep the phone and desktop on the same Wi-Fi network.
 4. Find the phone's local IP address on that Wi-Fi network.
-5. Check `http://<device-ip>:8080/health`.
+5. Check `http://<device-ip>:8080/health`, or use the configured port shown in the phone-side REPL settings.
 
 If `/health` works but shows `"accessibilityEnabled": false`, stop there and enable the AIVane accessibility service manually in Android Settings before trying `launch`, `list`, `tap`, or `input`.
 
@@ -38,7 +38,7 @@ Use these checkpoints to avoid guessing:
    Then run `uv tool install aivane-agent-android`.
    If `agent-android` is not found afterwards, run `uv tool update-shell`, reopen the terminal, and retry.
 2. `curl http://<device-ip>:8080/health`
-   Success should be JSON, not a timeout or connection-refused error. The payload should include basic service status and a `permissions` object.
+   Success should be JSON, not a timeout or connection-refused error. The payload should include basic service status, `version`, and a `permissions` object.
 3. `agent-android --health --url http://<device-ip>:8080`
    Success should print formatted JSON from the same `/health` endpoint.
 4. `agent-android --repl --url http://<device-ip>:8080`
@@ -105,6 +105,15 @@ For a workflow made of one main template plus child templates, zip the folder an
 
 ```bash
 agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
+For long-running templates or bundles, submit an async task and poll it by `taskId`:
+
+```bash
+agent-android --template template.json --async --url http://<device-ip>:8080
+agent-android --application-bundle app.zip --main-template-file __main__.json --async --url http://<device-ip>:8080
+agent-android --task TASK_ID --url http://<device-ip>:8080
+agent-android --task-logs TASK_ID --url http://<device-ip>:8080
 ```
 
 To push a standalone image, ordinary binary file, or one-off local file from the desktop to the phone:

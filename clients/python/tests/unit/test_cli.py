@@ -192,8 +192,10 @@ def test_main_template_executes_payload_and_prints_response(monkeypatch, tmp_pat
             seen["token"] = token
             self.base_url = url
 
-        def execute_template_payload(self, payload):
+        def execute_template_payload(self, payload, *, async_execution=False, timeout=30):
             seen["payload"] = payload
+            seen["async_execution"] = async_execution
+            seen["timeout"] = timeout
             return {"success": True, "data": {"runStatus": "SUCCESS"}}
 
     monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
@@ -212,8 +214,64 @@ def test_main_template_executes_payload_and_prints_response(monkeypatch, tmp_pat
         "url": "http://device:8080",
         "token": "shared-secret",
         "payload": template_payload,
+        "async_execution": False,
+        "timeout": 600,
     }
     assert json.loads(captured.out) == {"success": True, "data": {"runStatus": "SUCCESS"}}
+
+
+def test_main_template_async_passes_flag_and_prints_accepted_task(monkeypatch, tmp_path, capsys):
+    seen = {}
+    template_path = tmp_path / "template.json"
+    template_payload = {"templateId": "smoke-template", "operations": []}
+    template_path.write_text(json.dumps(template_payload), encoding="utf-8")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            seen["url"] = url
+            seen["token"] = token
+            self.base_url = url
+
+        def execute_template_payload(self, payload, *, async_execution=False, timeout=30):
+            seen["payload"] = payload
+            seen["async_execution"] = async_execution
+            seen["timeout"] = timeout
+            return {"success": True, "accepted": True, "taskId": "task-1", "status": "pending"}
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--template",
+            str(template_path),
+            "--async",
+            "--execute-timeout",
+            "12",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert seen == {
+        "url": "http://device:8080",
+        "token": None,
+        "payload": template_payload,
+        "async_execution": True,
+        "timeout": 12,
+    }
+    assert json.loads(captured.out) == {
+        "success": True,
+        "accepted": True,
+        "taskId": "task-1",
+        "status": "pending",
+    }
 
 
 def test_main_template_reports_missing_file(monkeypatch, capsys):
@@ -254,6 +312,7 @@ def test_main_application_bundle_executes_zip_and_prints_response(monkeypatch, t
             main_template_file=None,
             application_id=None,
             variables=None,
+            async_execution=False,
             timeout=600,
         ):
             seen["bundle"] = {
@@ -261,6 +320,7 @@ def test_main_application_bundle_executes_zip_and_prints_response(monkeypatch, t
                 "main_template_file": main_template_file,
                 "application_id": application_id,
                 "variables": variables,
+                "async_execution": async_execution,
                 "timeout": timeout,
             }
             return {"success": True, "data": {"templateId": "xhs-user-complaint"}}
@@ -301,10 +361,83 @@ def test_main_application_bundle_executes_zip_and_prints_response(monkeypatch, t
             "main_template_file": "xhs-complaint-full.json",
             "application_id": "xhs-complaint",
             "variables": {"keyword": "demo"},
+            "async_execution": False,
             "timeout": 123,
         },
     }
     assert json.loads(captured.out) == {"success": True, "data": {"templateId": "xhs-user-complaint"}}
+
+
+def test_main_application_bundle_async_passes_flag(monkeypatch, tmp_path, capsys):
+    seen = {}
+    bundle_path = tmp_path / "app.zip"
+    bundle_path.write_bytes(b"zip")
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            seen["url"] = url
+            seen["token"] = token
+            self.base_url = url
+
+        def execute_application_bundle(
+            self,
+            local_path,
+            *,
+            main_template_file=None,
+            application_id=None,
+            variables=None,
+            async_execution=False,
+            timeout=600,
+        ):
+            seen["bundle"] = {
+                "local_path": local_path,
+                "main_template_file": main_template_file,
+                "application_id": application_id,
+                "variables": variables,
+                "async_execution": async_execution,
+                "timeout": timeout,
+            }
+            return {"success": True, "accepted": True, "taskId": "task-2", "status": "pending"}
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--application-bundle",
+            str(bundle_path),
+            "--main-template-file",
+            "main.json",
+            "--async",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert seen == {
+        "url": "http://device:8080",
+        "token": None,
+        "bundle": {
+            "local_path": str(bundle_path),
+            "main_template_file": "main.json",
+            "application_id": None,
+            "variables": {},
+            "async_execution": True,
+            "timeout": 600,
+        },
+    }
+    assert json.loads(captured.out) == {
+        "success": True,
+        "accepted": True,
+        "taskId": "task-2",
+        "status": "pending",
+    }
 
 
 def test_main_application_bundle_reports_invalid_variables_json(monkeypatch, tmp_path, capsys):
@@ -336,6 +469,68 @@ def test_main_application_bundle_reports_invalid_variables_json(monkeypatch, tmp
     captured = capsys.readouterr()
     assert exc_info.value.code == 1
     assert "Variables JSON is invalid:" in captured.err
+
+
+@pytest.mark.parametrize(
+    ("argv_tail", "expected_call", "response"),
+    [
+        (["--tasks"], ("list_tasks", None), {"success": True, "tasks": []}),
+        (["--task", "task-1"], ("get_task", "task-1"), {"taskId": "task-1", "status": "running"}),
+        (["--current-task"], ("get_current_task", None), {"taskId": "task-2", "status": "running"}),
+        (["--task-logs", "task-3"], ("get_task_logs", "task-3"), {"taskId": "task-3", "events": []}),
+        (["--stop-task", "task-4"], ("stop_task", "task-4"), {"success": True, "status": "cancelled"}),
+    ],
+)
+def test_main_task_commands_print_json(monkeypatch, capsys, argv_tail, expected_call, response):
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            seen["url"] = url
+            seen["token"] = token
+            self.base_url = url
+
+        def list_tasks(self):
+            seen["call"] = ("list_tasks", None)
+            return response
+
+        def get_task(self, task_id):
+            seen["call"] = ("get_task", task_id)
+            return response
+
+        def get_current_task(self):
+            seen["call"] = ("get_current_task", None)
+            return response
+
+        def get_task_logs(self, task_id):
+            seen["call"] = ("get_task_logs", task_id)
+            return response
+
+        def stop_task(self, task_id):
+            seen["call"] = ("stop_task", task_id)
+            return response
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", *argv_tail])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert seen == {"url": "http://device:8080", "token": None, "call": expected_call}
+    assert json.loads(captured.out) == response
+
+
+def test_main_async_requires_template_or_application_bundle(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["agent-android", "--url", "http://device:8080", "--async", "--health"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "--async requires --template or --application-bundle" in captured.err
 
 
 def test_main_upload_passes_default_overwrite_true(monkeypatch, tmp_path, capsys):

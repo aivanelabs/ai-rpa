@@ -30,12 +30,22 @@ For prepared multi-step flows:
 
 ```bash
 agent-android --template template.json --url http://<device-ip>:8080
+agent-android --template template.json --async --url http://<device-ip>:8080
 ```
 
 For a workflow bundle with one main template plus child templates:
 
 ```bash
 agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+agent-android --application-bundle app.zip --main-template-file __main__.json --async --url http://<device-ip>:8080
+```
+
+Async execution returns a `taskId` immediately. Poll or stop the task with:
+
+```bash
+agent-android --task TASK_ID --url http://<device-ip>:8080
+agent-android --task-logs TASK_ID --url http://<device-ip>:8080
+agent-android --stop-task TASK_ID --url http://<device-ip>:8080
 ```
 
 For syncing templates, images, or other files from your computer to the phone:
@@ -56,7 +66,7 @@ agent-android --upload foo.json --remote-path Templates/foo.json --no-overwrite 
 ## Notes
 
 - The package uses a standard `src` layout under `src/agent_android`.
-- The phone hosts the beta HTTP service locally and the client connects directly to `http://<device-ip>:8080`.
+- The phone hosts the beta HTTP service locally and the client connects directly to `http://<device-ip>:8080` by default. If the phone-side REPL settings use a different port, pass that port in `--url`.
 - If a command cannot connect, first check whether the AIVane app or its local API service has exited on the phone, then retry `/health`.
 
 
