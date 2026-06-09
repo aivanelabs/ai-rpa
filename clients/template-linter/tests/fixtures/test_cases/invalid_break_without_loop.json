@@ -1,0 +1,9 @@
+{
+  "templateId": "test-invalid-3",
+  "templateName": "Break outside loop",
+  "operations": [
+    {
+      "operationType": "break"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "templateId": "test-invalid-6",
+  "templateName": "Undefined variable reference",
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "Value: ${undefinedVar}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "templateId": "test-invalid-8",
+  "templateName": "Unknown parameter error",
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "hello",
+        "nonexistentParam": 123
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "templateId": "child",
+  "templateName": "Child Template",
+  "parameters": [
+    {
+      "name": "message",
+      "type": "STRING",
+      "required": true
+    }
+  ],
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "${message}"
+      }
+    }
+  ]
+}

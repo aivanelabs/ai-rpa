@@ -1,0 +1,39 @@
+{
+  "templateId": "test-valid-single-nested-operation",
+  "templateName": "Valid single-object nested operation template",
+  "operations": [
+    {
+      "operationType": "variable.assign",
+      "parameters": {
+        "variableName": "count",
+        "value": 10
+      }
+    },
+    {
+      "operationType": "ifelse",
+      "parameters": {
+        "condition": "${count > 5}",
+        "ifBranch": {
+          "operationType": "console.write",
+          "parameters": {
+            "message": "if branch executed",
+            "level": "INFO"
+          }
+        },
+        "elseBranch": {
+          "operationType": "console.write",
+          "parameters": {
+            "message": "else branch executed",
+            "level": "INFO"
+          }
+        }
+      }
+    },
+    {
+      "operationType": "assert.true",
+      "parameters": {
+        "condition": "${count < 100}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "templateId": "business-main",
+  "templateName": "Business Main",
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "hello"
+      }
+    }
+  ]
+}

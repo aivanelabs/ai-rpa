@@ -1,0 +1,11 @@
+{
+  "templateId": "test-invalid-1",
+  "operations": [
+    {
+      "operationType": "ifelse",
+      "parameters": {
+        "ifBranch": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "templateId": "test-invalid-2",
+  "templateName": "Unknown operation type test",
+  "operations": [
+    {
+      "operationType": "unknown.operation",
+      "parameters": {
+        "someParam": "value"
+      }
+    }
+  ]
+}

@@ -118,6 +118,19 @@ agent-android --upload foo.json --remote-path Templates/foo.json --url http://<d
 
 默认会覆盖目标文件。需要拒绝覆盖时加 `--no-overwrite`。如果文件在某个 URL 上，需要让手机端模板自己下载并保存，请用 `http.download`；它适合图片、JSON 模板、zip、文本文件和其他二进制文件。`http.get` 仍然适合把文本或 JSON 响应读入变量。
 
+## 模板校验
+
+如果你想在真机执行前检查单个模板或 application bundle，可以安装模板 linter：
+
+```bash
+uv tool install aivane-template-linter
+aivane-template-lint my-app -r
+```
+
+它会检查 JSON 格式、OperationType 参数、变量引用，以及 `app.json` 主模板解析、`template.execute` 子模板调用和跨模板参数关系。
+
+模板开发说明见 [docs/templates/](docs/templates/)，OperationType 参考见 [docs/operation-types/](docs/operation-types/)。
+
 ## 这个 Beta 是什么
 
 - 基于局域网的本地优先 Android 自动化
@@ -143,13 +156,18 @@ agent-android --upload foo.json --remote-path Templates/foo.json --url http://<d
 
 - PyPI 包名：`aivane-agent-android`
 - 对外命令：`agent-android`
+- 模板 linter 包名：`aivane-template-linter`
+- 模板 linter 命令：`aivane-template-lint`
 - Skill：[`skills/agent-android/`](skills/agent-android/)
 - APK 下载：[GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 
 ## 仓库内容
 
 - `clients/python/`：采用标准 `src` 布局的可发布 Python CLI 包
+- `clients/template-linter/`：采用标准 `src` 布局的可发布模板校验 CLI 包
 - `docs/`：quickstart、安装、协议、权限、发布说明等文档
+- `docs/templates/`：模板编写、application 结构和 lint 使用说明
+- `docs/operation-types/`：公开 OperationType 参考文档
 - `docs/assets/`：README 引用的演示视频、截图等文档媒体资源
 - `examples/`：smoke flow 和启动辅助脚本
 - `skills/agent-android/`：可安装的公开 skill
@@ -159,6 +177,8 @@ agent-android --upload foo.json --remote-path Templates/foo.json --url http://<d
 - [docs/quickstart.md](docs/quickstart.md)
 - [docs/install-agent-android.md](docs/install-agent-android.md)
 - [docs/agent-examples.md](docs/agent-examples.md)
+- [docs/templates/README.md](docs/templates/README.md)
+- [docs/operation-types/README.md](docs/operation-types/README.md)
 - [docs/release-checklist.md](docs/release-checklist.md)
 - [docs/known-limitations.md](docs/known-limitations.md)
 
