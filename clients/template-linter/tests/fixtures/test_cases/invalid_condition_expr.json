@@ -1,0 +1,13 @@
+{
+  "templateId": "test-invalid-5",
+  "templateName": "Invalid condition expression",
+  "operations": [
+    {
+      "operationType": "ifelse",
+      "parameters": {
+        "condition": "${value} === 5",
+        "ifBranch": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "templateId": "test-valid",
+  "templateName": "Valid template test",
+  "description": "A fully valid template that should pass all checks",
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "Hello, World!"
+      }
+    },
+    {
+      "operationType": "variable.assign",
+      "parameters": {
+        "variableName": "count",
+        "value": 0
+      }
+    },
+    {
+      "operationType": "while",
+      "parameters": {
+        "condition": "${count} < 5",
+        "operations": [
+          {
+            "operationType": "console.write",
+            "parameters": {
+              "message": "Count: ${count}"
+            }
+          },
+          {
+            "operationType": "variable.assign",
+            "parameters": {
+              "variableName": "count",
+              "value": "${count + 1}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "operationType": "ifelse",
+      "parameters": {
+        "condition": "${count} == 5",
+        "ifBranch": [
+          {
+            "operationType": "console.write",
+            "parameters": {
+              "message": "Loop completed!"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

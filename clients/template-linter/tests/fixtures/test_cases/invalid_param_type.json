@@ -1,0 +1,12 @@
+{
+  "templateId": "test-invalid-4",
+  "templateName": "Invalid parameter type",
+  "operations": [
+    {
+      "operationType": "wait.duration",
+      "parameters": {
+        "milliseconds": "not a number"
+      }
+    }
+  ]
+}

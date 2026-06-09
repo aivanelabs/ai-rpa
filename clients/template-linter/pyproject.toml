@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aivane-template-linter"
+dynamic = ["version"]
+description = "Static linter for AIVane templates and application bundles"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "AIVane Labs" }]
+keywords = ["aivane", "template", "linter", "automation", "rpa"]
+dependencies = [
+  "PyYAML>=6.0",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/aivanelabs/ai-rpa"
+Issues = "https://github.com/aivanelabs/ai-rpa/issues"
+Repository = "https://github.com/aivanelabs/ai-rpa"
+Documentation = "https://github.com/aivanelabs/ai-rpa/tree/main/docs/templates"
+
+[project.scripts]
+aivane-template-lint = "aivane_template_linter.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "aivane_template_linter.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aivane_template_linter = [
+  "operationtypes/**/*.md",
+  "operationtypes/*.md",
+  "operationtypes/*.json",
+]

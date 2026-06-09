@@ -1,0 +1,6 @@
+{
+  "applicationId": "invalid-application",
+  "applicationName": "Invalid Application",
+  "version": "1.0.0",
+  "mainTemplateId": "__main__"
+}
