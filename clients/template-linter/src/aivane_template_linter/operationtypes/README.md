@@ -1,69 +1,43 @@
-# OperationType Documentation
+# OperationType Reference
 
-Welcome to the AIVane OperationType documentation. This guide explains how to build, validate, and run automation templates.
+This directory is the public OperationType reference used by AIVane templates.
 
----
+Each OperationType page contains machine-readable front matter plus human-readable notes. The `aivane-template-linter` package uses the same schema shape to validate template JSON files and application bundles.
 
-## Overview
+## Browse
 
-AIVane uses a JSON-based template system to define automation tasks.
-Each template contains a sequence of OperationTypes that can run across Windows and Android platforms.
+- [INDEX.md](INDEX.md): all OperationTypes grouped by module
+- `android/`: Android UI, input, app, screenshot, and device operations
+- `browser/`: browser automation operations
+- `core/`: template control flow, variables, logging, and application execution
+- `dataprocessing/`: JSON, JSONata, list, dict, date/time, and string helpers
+- `file/`: file operations
+- `network/`: HTTP and upload/download operations
+- `testing/`: assertion-style operations
+- `windows/`: Windows-oriented operations
 
-## Quick Start
+## Validate Templates
 
-### 1. Create a Template
-
-```json
-{
-  "templateId": "my-template",
-  "templateName": "My Automation Template",
-  "description": "A sample automation template",
-  "operations": [
-    {
-      "operationType": "console.write",
-      "parameters": {
-        "message": "Hello, AIVane!"
-      }
-    }
-  ]
-}
-```
-
-### 2. Browse Available OperationTypes
-
-See [INDEX.md](INDEX.md) for the full list of available OperationTypes by module.
-
-### 3. Validate Templates
-
-Use `template_linter.py` to validate template structure and operation usage:
+Install the public linter:
 
 ```bash
-# Validate a template
-python tools/template-linter/template_linter.py validate my-template.json
-
-# Check a specific operation usage
-python tools/template-linter/template_linter.py check-operation my-template.json "console.write"
-
-# Auto-fix simple issues
-python tools/template-linter/template_linter.py fix my-template.json
+uv tool install aivane-template-linter
 ```
 
-### 4. Run Templates
+Validate an application bundle directory:
 
 ```bash
-# Run a template
-python run-template.py my-template.json
-
-# Use timeout to avoid infinite loops
-timeout 30 python run-template.py my-template.json
+aivane-template-lint path/to/my-app -r
 ```
 
----
+Validate against a local schema checkout instead of the bundled schema snapshot:
 
-## Documentation Structure
+```bash
+aivane-template-lint path/to/my-app -r --docs-dir docs/operation-types
+```
 
-- `INDEX.md`: index of all OperationTypes
-- `<module>/<operation>.md`: detailed docs for each OperationType
-- `README.md`: this guide
-- `EXAMPLES.json`: sample templates
-- `tools/template-linter/`: template validation tooling
+## Runtime Compatibility
+
+These docs describe the OperationType schema snapshot published with this repository. Runtime support depends on the installed AIVane Android REPL version and the template executor bundled in that release.
+
+For template structure and linting workflow guidance, see [Template docs](../templates/README.md).
