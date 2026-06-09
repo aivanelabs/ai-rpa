@@ -256,6 +256,8 @@ def test_health_endpoint_reports_running(device_context: DeviceContext):
     health = _wait_for_health(device_context.base_url, timeout_seconds=5)
 
     assert health["service"] == "aivane-repl"
+    assert isinstance(health.get("version"), str)
+    assert health["version"]
     _assert_healthy_status(health)
 
 

@@ -79,6 +79,12 @@ class AgentAndroidClient:
             headers["x-api-token"] = self.token
         return headers
 
+    def _build_url(self, path: str, params: Optional[Dict[str, Any]] = None) -> str:
+        url = self.base_url + path
+        if params:
+            url += '?' + urllib.parse.urlencode(params)
+        return url
+
     def _decode_json_response_body(self, body: bytes, fallback: Dict[str, Any]) -> Dict[str, Any]:
         if not body.strip():
             return dict(fallback)
@@ -92,28 +98,55 @@ class AgentAndroidClient:
         result["data"] = parsed
         return result
 
-    def _api_call(self, template: Dict) -> Optional[Dict]:
+    def _api_call(
+        self,
+        template: Dict,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: int = 30,
+    ) -> Optional[Dict]:
         """Send an API request."""
+        url = self.execute_url
+        if params:
+            url += "?" + urllib.parse.urlencode(params)
         try:
             data = json.dumps(template, ensure_ascii=False).encode('utf-8')
             req = urllib.request.Request(
-                self.execute_url,
+                url,
                 data=data,
                 headers=self._build_headers(content_type="application/json"),
                 method='POST'
             )
-            with self._opener.open(req, timeout=30) as response:
+            with self._opener.open(req, timeout=timeout) as response:
                 return json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            self._print_transport_error("POST", url, e)
+            error_fallback = {
+                "success": False,
+                "status": e.code,
+                "errorMessage": self._describe_transport_error(e),
+            }
+            result = self._decode_json_response_body(e.read(), error_fallback)
+            result.setdefault("success", False)
+            result.setdefault("status", e.code)
+            return result
         except urllib.error.URLError as e:
-            self._print_transport_error("POST", self.execute_url, e)
+            self._print_transport_error("POST", url, e)
             return None
         except Exception as e:
-            print(f"POST {self.execute_url} failed: {e}", file=sys.stderr)
+            print(f"POST {url} failed: {e}", file=sys.stderr)
             return None
 
-    def execute_template_payload(self, payload: Dict[str, Any]) -> Optional[Dict]:
+    def execute_template_payload(
+        self,
+        payload: Dict[str, Any],
+        *,
+        async_execution: bool = False,
+        timeout: int = 30,
+    ) -> Optional[Dict]:
         """Execute a raw template payload via /execute."""
-        return self._api_call(payload)
+        params = {"async": "true"} if async_execution else None
+        return self._api_call(payload, params=params, timeout=timeout)
 
     def execute_application_bundle(
         self,
@@ -122,6 +155,7 @@ class AgentAndroidClient:
         main_template_file: Optional[str] = None,
         application_id: Optional[str] = None,
         variables: Optional[Dict[str, Any]] = None,
+        async_execution: bool = False,
         timeout: int = 600,
     ) -> Optional[Dict[str, Any]]:
         """Execute a zipped application bundle via /executeApplication."""
@@ -148,6 +182,8 @@ class AgentAndroidClient:
             params["applicationId"] = application_id
         if variables:
             params["variables"] = json.dumps(variables, ensure_ascii=False, separators=(",", ":"))
+        if async_execution:
+            params["async"] = "true"
 
         url = self.execute_application_url
         if params:
@@ -272,11 +308,45 @@ class AgentAndroidClient:
             print(f"POST {url} failed: {e}", file=sys.stderr)
             return None
 
+    def _post_raw(
+        self,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: int = 30,
+    ) -> Optional[Dict[str, Any]]:
+        """Send a POST request without a request body."""
+        url = self._build_url(path, params)
+        try:
+            req = urllib.request.Request(
+                url,
+                data=b"",
+                headers=self._build_headers(user_agent="agent-android/0.1"),
+                method="POST",
+            )
+            with self._opener.open(req, timeout=timeout) as response:
+                return self._decode_json_response_body(response.read(), {"success": True})
+        except urllib.error.HTTPError as e:
+            self._print_transport_error("POST", url, e)
+            error_fallback = {
+                "success": False,
+                "status": e.code,
+                "errorMessage": self._describe_transport_error(e),
+            }
+            result = self._decode_json_response_body(e.read(), error_fallback)
+            result.setdefault("success", False)
+            result.setdefault("status", e.code)
+            return result
+        except urllib.error.URLError as e:
+            self._print_transport_error("POST", url, e)
+            return None
+        except Exception as e:
+            print(f"POST {url} failed: {e}", file=sys.stderr)
+            return None
+
     def _get_raw(self, path: str, params: Dict = None) -> Optional[Dict]:
         """Send a GET request for endpoints such as /health, /screenshot, and /download."""
-        url = self.base_url + path
-        if params:
-            url += '?' + urllib.parse.urlencode(params)
+        url = self._build_url(path, params)
         try:
             req = urllib.request.Request(
                 url,
@@ -316,6 +386,33 @@ class AgentAndroidClient:
         """Retrieve the service health payload from /health."""
         result = self._get_raw("/health")
         return result if isinstance(result, dict) else None
+
+    def list_tasks(self) -> Optional[Dict[str, Any]]:
+        """Retrieve retained async REPL API tasks from /tasks."""
+        result = self._get_raw("/tasks")
+        return result if isinstance(result, dict) else None
+
+    def get_current_task(self) -> Optional[Dict[str, Any]]:
+        """Retrieve the currently active async REPL API task."""
+        result = self._get_raw("/tasks/current")
+        return result if isinstance(result, dict) else None
+
+    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve one async REPL API task status by id."""
+        encoded = urllib.parse.quote(str(task_id), safe="")
+        result = self._get_raw(f"/tasks/{encoded}")
+        return result if isinstance(result, dict) else None
+
+    def get_task_logs(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve bounded in-memory logs for one async REPL API task."""
+        encoded = urllib.parse.quote(str(task_id), safe="")
+        result = self._get_raw(f"/tasks/{encoded}/logs")
+        return result if isinstance(result, dict) else None
+
+    def stop_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Request cancellation for one async REPL API task."""
+        encoded = urllib.parse.quote(str(task_id), safe="")
+        return self._post_raw(f"/tasks/{encoded}/stop")
 
     def _download_binary(self, path: str, params: Dict = None) -> Optional[bytes]:
         """Download a binary payload from the Android runtime."""
