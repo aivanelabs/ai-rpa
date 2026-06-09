@@ -1,0 +1,12 @@
+{
+  "templateId": "__main__",
+  "templateName": "Main Template",
+  "operations": [
+    {
+      "operationType": "template.execute",
+      "parameters": {
+        "templateId": "missing-child"
+      }
+    }
+  ]
+}

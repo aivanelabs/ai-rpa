@@ -1,0 +1,13 @@
+{
+  "templateId": "test-valid-allow-empty-required",
+  "templateName": "Required parameter allows empty string",
+  "operations": [
+    {
+      "operationType": "variable.assign",
+      "parameters": {
+        "variableName": "noteContent",
+        "value": ""
+      }
+    }
+  ]
+}

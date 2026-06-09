@@ -1,0 +1,13 @@
+{
+  "templateId": "test-valid-conditional-locator",
+  "templateName": "Valid conditional locator mode",
+  "operations": [
+    {
+      "operationType": "android.touch.tap",
+      "parameters": {
+        "mode": "locator",
+        "xpath": "//*[@text='OK']"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "templateId": "test-invalid-7",
+  "templateName": "Invalid enum parameter",
+  "operations": [
+    {
+      "operationType": "console.write",
+      "parameters": {
+        "message": "hello",
+        "level": "TRACE"
+      }
+    }
+  ]
+}

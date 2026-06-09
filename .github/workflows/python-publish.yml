@@ -1,9 +1,9 @@
-name: Publish Python Package
+name: Publish Agent Android
 
 on:
   push:
     tags:
-      - "v*"
+      - "agent-android-v*"
 
 jobs:
   build:

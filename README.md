@@ -120,6 +120,19 @@ agent-android --upload foo.json --remote-path Templates/foo.json --url http://<d
 
 Uploads overwrite by default. Add `--no-overwrite` to reject an existing target. In templates, use `http.download` when the phone should fetch and save an image, JSON template, zip, text file, or other binary file from a URL. Keep `http.get` for text or JSON responses that should be read into variables.
 
+## Template Validation
+
+Install the template linter when you want to check a template or application bundle before running it on a device:
+
+```bash
+uv tool install aivane-template-linter
+aivane-template-lint my-app -r
+```
+
+The linter validates template JSON, OperationType parameters, variable references, and application-level relationships such as `app.json` main template resolution and `template.execute` child template calls.
+
+See [docs/templates/](docs/templates/) for authoring guidance and [docs/operation-types/](docs/operation-types/) for the OperationType reference.
+
 ## What This Beta Is
 
 - Local-first Android automation over LAN
@@ -145,13 +158,18 @@ Uploads overwrite by default. Add `--no-overwrite` to reject an existing target.
 
 - PyPI package: `aivane-agent-android`
 - Console command: `agent-android`
+- Template linter package: `aivane-template-linter`
+- Template linter command: `aivane-template-lint`
 - Skill: [`skills/agent-android/`](skills/agent-android/)
 - APK builds: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 
 ## Repo Layout
 
 - `clients/python/`: publishable Python CLI package using a standard `src` layout
+- `clients/template-linter/`: publishable Python template linting CLI package
 - `docs/`: quickstart, install, protocol, permissions, release, and support docs
+- `docs/templates/`: template authoring and linting guidance
+- `docs/operation-types/`: public OperationType reference
 - `docs/assets/`: README-linked media such as demo videos and screenshots
 - `examples/`: smoke-flow examples and launch helpers
 - `skills/agent-android/`: installable public skill definition
@@ -161,6 +179,8 @@ Uploads overwrite by default. Add `--no-overwrite` to reject an existing target.
 - [docs/quickstart.md](docs/quickstart.md)
 - [docs/install-agent-android.md](docs/install-agent-android.md)
 - [docs/agent-examples.md](docs/agent-examples.md)
+- [docs/templates/README.md](docs/templates/README.md)
+- [docs/operation-types/README.md](docs/operation-types/README.md)
 - [docs/release-checklist.md](docs/release-checklist.md)
 - [docs/known-limitations.md](docs/known-limitations.md)
 

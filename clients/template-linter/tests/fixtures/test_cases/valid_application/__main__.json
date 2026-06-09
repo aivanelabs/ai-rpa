@@ -1,0 +1,23 @@
+{
+  "templateId": "__main__",
+  "templateName": "Main Template",
+  "parameters": [
+    {
+      "name": "message",
+      "type": "STRING",
+      "required": false,
+      "defaultValue": "hello"
+    }
+  ],
+  "operations": [
+    {
+      "operationType": "template.execute",
+      "parameters": {
+        "templateId": "child",
+        "parameters": {
+          "message": "${message}"
+        }
+      }
+    }
+  ]
+}

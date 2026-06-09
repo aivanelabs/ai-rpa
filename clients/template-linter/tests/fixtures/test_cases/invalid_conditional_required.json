@@ -1,0 +1,13 @@
+{
+  "templateId": "test-invalid-conditional-required",
+  "templateName": "Missing conditional required parameter",
+  "operations": [
+    {
+      "operationType": "android.touch.tap",
+      "parameters": {
+        "mode": "coordinate",
+        "x": 120
+      }
+    }
+  ]
+}
