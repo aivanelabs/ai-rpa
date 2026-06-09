@@ -809,6 +809,95 @@ def test_main_tap_and_input_xpath_use_repl_handlers(monkeypatch):
     assert seen["input"] == ("//EditText", "hello")
 
 
+def test_main_swipe_refid_uses_repl_handler(monkeypatch):
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def swipe_element(self, ref_id, direction, duration=300, distance=0.5):
+            seen["swipe_element"] = (ref_id, direction, duration, distance)
+            return True
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--swipe",
+            "up",
+            "--swipe-refid",
+            "7",
+            "--duration",
+            "450",
+            "--distance",
+            "0.75",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    assert exc_info.value.code == 0
+    assert seen["swipe_element"] == (7, "up", 450, 0.75)
+
+
+def test_main_swipe_xpath_uses_repl_handler(monkeypatch):
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, url, token=None):
+            self.base_url = url
+            self.token = token
+
+        def swipe_by_xpath(self, xpath, direction, duration=300, distance=0.5):
+            seen["swipe_xpath"] = (xpath, direction, duration, distance)
+            return True
+
+    monkeypatch.setattr(cli_module, "AgentAndroidClient", FakeClient)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-android",
+            "--url",
+            "http://device:8080",
+            "--swipe",
+            "left",
+            "--swipe-xpath",
+            "//node[@text='Hello world']",
+            "--duration",
+            "500",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    assert exc_info.value.code == 0
+    assert seen["swipe_xpath"] == ("//node[@text='Hello world']", "left", 500, 0.5)
+
+
+def test_main_swipe_target_requires_swipe(monkeypatch, capsys):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-android", "--url", "http://device:8080", "--swipe-refid", "7"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_module.main()
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "--swipe-refid requires --swipe" in captured.err
+
+
 def test_cli_help_mentions_new_repl_commands(capsys):
     parser = cli_module.build_parser()
 
@@ -827,5 +916,7 @@ def test_cli_help_mentions_new_repl_commands(capsys):
     assert "--multi-xpath REFIDS" in captured.out
     assert "--validate-xpath XPATH" in captured.out
     assert "--tap-xpath XPATH" in captured.out
+    assert "--swipe-refid REFID" in captured.out
+    assert "--swipe-xpath XPATH" in captured.out
     assert "--upload LOCAL_FILE" in captured.out
     assert "--remote-path REMOTE_PATH" in captured.out

@@ -81,6 +81,8 @@ Actions:
 - `agent-android --tap 7 --url http://<device-ip>:8080`
 - `agent-android --input 7 "hello world" --url http://<device-ip>:8080`
 - `agent-android --swipe up --url http://<device-ip>:8080`
+- `agent-android --swipe up --swipe-refid 7 --url http://<device-ip>:8080`
+- `agent-android --swipe up --swipe-xpath "//RecyclerView[1]" --url http://<device-ip>:8080`
 - `agent-android --back --url http://<device-ip>:8080`
 - `agent-android --press home --url http://<device-ip>:8080`
 - `agent-android --screenshot --url http://<device-ip>:8080`
@@ -135,8 +137,10 @@ Use the REPL for exploratory tasks and smoke runs. Short aliases and long names 
 - `ix <xpath> <text>` or `inputx <xpath> <text>`
   Input text into one XPath target.
   Use `ix <xpath> --` or `--clear` to clear the field.
-- `sw <d|u|l|r> [--dur N] [--dist N]` or `swipe ...`
-  Swipe down/up/left/right with optional duration and distance.
+- `sw <d|u|l|r> [refId] [--dur N] [--dist N]` or `swipe ...`
+  Swipe down/up/left/right across the screen, or inside a refId target when provided.
+- `swx <d|u|l|r> <xpath> [--dur N] [--dist N]` or `swipex ...`
+  Swipe inside one XPath target.
 - `p <back|home|recents>` or `press ...`
   Press a system key.
 - `b` or `back`

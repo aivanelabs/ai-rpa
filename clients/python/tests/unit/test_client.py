@@ -903,6 +903,93 @@ def test_input_by_xpath_allows_clearing_input(client, monkeypatch):
     assert calls[0]["success_message"] == "Cleared XPath [//EditText[@text='Search']]"
 
 
+def test_swipe_by_xpath_uses_element_locator_payload(client, monkeypatch):
+    calls = []
+
+    def fake_run_single_operation(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True
+
+    monkeypatch.setattr(client, "_run_single_operation", fake_run_single_operation)
+
+    assert client.swipe_by_xpath("//RecyclerView[1]", "up", 450, 0.75) is True
+
+    args, kwargs = calls[0]
+    assert args == ()
+    assert kwargs["template_id"] == "swipe-xpath"
+    assert kwargs["operation_type"] == "android.touch.swipe"
+    assert kwargs["parameters"] == {
+        "mode": "element",
+        "area": "element",
+        "type": "direction",
+        "direction": "up",
+        "duration": 450,
+        "distance": 0.75,
+        "xpath": "//RecyclerView[1]",
+    }
+
+
+def test_swipe_element_resolves_refid_to_runtime_xpath(client, monkeypatch):
+    tree = [
+        {
+            "refId": 7,
+            "text": "",
+            "contentDesc": "Feed",
+            "simpleClassName": "RecyclerView",
+            "bounds": "[0,0][100,500]",
+            "xpath": "/WindowRoot/RecyclerView[1]",
+        }
+    ]
+    calls = []
+
+    monkeypatch.setattr(client, "_resolve_action_target", lambda _ref_id: tree[0])
+    monkeypatch.setattr(client, "get_ui_elements", lambda *args, **kwargs: tree)
+    monkeypatch.setattr(
+        client,
+        "build_runtime_absolute_xpath",
+        lambda _tree, _elem: "/hierarchy/RecyclerView[1]",
+    )
+
+    def fake_run_single_operation(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True
+
+    monkeypatch.setattr(client, "_run_single_operation", fake_run_single_operation)
+
+    assert client.swipe_element(7, "down", 600, 0.6) is True
+
+    args, kwargs = calls[0]
+    assert args == ()
+    assert kwargs["template_id"] == "swipe-refId-7-down"
+    assert kwargs["parameters"] == {
+        "mode": "element",
+        "area": "element",
+        "type": "direction",
+        "direction": "down",
+        "duration": 600,
+        "distance": 0.6,
+        "xpath": "/hierarchy/RecyclerView[1]",
+    }
+
+
+def test_swipe_element_falls_back_to_element_object(client, monkeypatch):
+    target = {"refId": 7, "simpleClassName": "RecyclerView"}
+    calls = []
+
+    monkeypatch.setattr(client, "_resolve_action_target", lambda _ref_id: target)
+    monkeypatch.setattr(client, "_resolve_runtime_xpath_for_target", lambda _ref_id, _target: None)
+
+    def fake_run_single_operation(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True
+
+    monkeypatch.setattr(client, "_run_single_operation", fake_run_single_operation)
+
+    assert client.swipe_element(7, "left") is True
+
+    assert calls[0][1]["parameters"]["element"] == target
+
+
 def test_press_key_supports_menu(client, monkeypatch):
     templates = []
 

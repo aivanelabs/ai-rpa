@@ -1030,6 +1030,98 @@ class AgentAndroidClient:
     # ---------------------------------------------------------------------------
     # ---------------------------------------------------------------------------
 
+    def _normalize_swipe_direction(self, direction: str) -> Optional[str]:
+        d = direction.lower()
+        if d not in ('up', 'down', 'left', 'right'):
+            print(f"Invalid direction: {direction}, use: up/down/left/right")
+            return None
+        return d
+
+    def _swipe_element_parameters(
+        self,
+        direction: str,
+        duration: int,
+        distance: float,
+        **locator: Any,
+    ) -> Dict[str, Any]:
+        parameters: Dict[str, Any] = {
+            "mode": "element",
+            "area": "element",
+            "type": "direction",
+            "direction": direction,
+            "duration": duration,
+            "distance": distance,
+        }
+        parameters.update(locator)
+        return parameters
+
+    def _resolve_runtime_xpath_for_target(
+        self,
+        refId: int,
+        target: Dict[str, Any],
+    ) -> Optional[str]:
+        tree = self._local_tree or self.get_ui_elements(force_refresh=True)
+        if not tree:
+            return None
+
+        tree_target = self._find_in_elements(tree, refId)
+        if tree_target is None:
+            tree_target = self._find_matching_snapshot_identity(target, tree)
+        if tree_target is None:
+            return None
+        return self.build_runtime_absolute_xpath(tree, tree_target)
+
+    def swipe_element(
+        self,
+        refId: int,
+        direction: str = "down",
+        duration: int = 300,
+        distance: float = 0.5,
+    ) -> bool:
+        """Swipe inside the element area for the given refId when possible."""
+        d = self._normalize_swipe_direction(direction)
+        if d is None:
+            return False
+
+        target = self._resolve_action_target(refId)
+        if not target:
+            return False
+
+        xpath = self._resolve_runtime_xpath_for_target(refId, target)
+        locator: Dict[str, Any]
+        if xpath:
+            locator = {"xpath": xpath}
+        else:
+            locator = {"element": target}
+
+        return self._run_single_operation(
+            template_id=f"swipe-refId-{refId}-{d}",
+            operation_type="android.touch.swipe",
+            parameters=self._swipe_element_parameters(d, duration, distance, **locator),
+            success_message=f"Swiped {d} in refId={refId} (duration={duration}ms, distance={distance})",
+            failure_prefix="Swipe failed"
+        )
+
+    def swipe_by_xpath(
+        self,
+        xpath: str,
+        direction: str = "down",
+        duration: int = 300,
+        distance: float = 0.5,
+    ) -> bool:
+        """Swipe inside one runtime-resolved XPath element area."""
+        d = self._normalize_swipe_direction(direction)
+        if d is None:
+            return False
+
+        return self._run_single_operation(
+            template_id="swipe-xpath",
+            operation_type="android.touch.swipe",
+            parameters=self._swipe_element_parameters(d, duration, distance, xpath=xpath),
+            success_message=f"Swiped {d} in XPath [{xpath}] (duration={duration}ms, distance={distance})",
+            failure_prefix="Swipe failed"
+        )
+
     def screenshot(self, output_path: str = None,
                    quality: int = 80) -> Optional[str]:
         """

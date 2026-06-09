@@ -35,6 +35,8 @@ One-off examples:
     agent-android --task TASK_ID --url http://<device-ip>:8080
     agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
     agent-android --swipe up --url http://<device-ip>:8080
+    agent-android --swipe up --swipe-refid 7 --url http://<device-ip>:8080
+    agent-android --swipe up --swipe-xpath "//RecyclerView[1]" --url http://<device-ip>:8080
     agent-android --screenshot --url http://<device-ip>:8080
     agent-android --wait-for Search --timeout 30 --url http://<device-ip>:8080
     agent-android --xpath 7 --url http://<device-ip>:8080
@@ -57,7 +59,8 @@ REPL quick reference:
     tx <xpath>                Tap by XPath locator
     i <N> <text>              Enter text into refId=N (--clear or "" clears it)
     ix <xpath> <text>         Enter text via XPath locator
-    sw <d|u|l|r>              Swipe direction (supports --dur/--dist)
+    sw <d|u|l|r> [N]          Swipe screen or refId=N (supports --dur/--dist)
+    swx <d|u|l|r> <xpath>     Swipe by XPath locator
     wf <text>                 Wait for element text (use --t to override timeout)
     g <N> <attr>              Inspect an attribute for refId=N
     s [path]                  Capture screenshot
@@ -138,6 +141,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--duration", type=int, default=300, help="Swipe duration in ms (default: 300)")
     parser.add_argument("--distance", type=float, default=0.5, help="Swipe distance ratio 0.0-1.0 (default: 0.5)")
+    parser.add_argument("--swipe-refid", "--swipe-refId", dest="swipe_refid", type=int, metavar="REFID", help="Swipe inside a refId target; requires --swipe")
+    parser.add_argument("--swipe-xpath", "--swipex", dest="swipe_xpath", metavar="XPATH", help="Swipe inside an XPath target; requires --swipe")
     parser.add_argument("--quality", "-q", type=int, default=80, help="Screenshot quality 1-100 (default: 80)")
     parser.add_argument("--match-index", type=int, help="Match index for --validate-xpath detail inspection")
     parser.add_argument("--ui-tree-all", action="store_true", help="Include off-screen nodes for --ui-tree")
@@ -295,9 +300,14 @@ def _run_direct_commands(args: argparse.Namespace, client: AgentAndroidClient) -
         output_path = None if args.screenshot == "_auto_" else args.screenshot
         raise SystemExit(0 if client.screenshot(output_path=output_path, quality=args.quality) else 1)
     if args.swipe:
-        _exit_with_repl_result(
-            session._cmd_swipe([args.swipe, "--dur", str(args.duration), "--dist", str(args.distance)])
-        )
+        if args.swipe_xpath:
+            _exit_with_repl_result(
+                session._cmd_swipex([args.swipe, args.swipe_xpath, "--dur", str(args.duration), "--dist", str(args.distance)])
+            )
+        command_args = [args.swipe, "--dur", str(args.duration), "--dist", str(args.distance)]
+        if args.swipe_refid is not None:
+            command_args.insert(1, str(args.swipe_refid))
+        _exit_with_repl_result(session._cmd_swipe(command_args))
     if args.tap is not None:
         _exit_with_repl_result(session._cmd_tap([str(args.tap)]))
     if args.input:
@@ -442,6 +452,12 @@ def main() -> int:
         parser.error("--remote-path requires --upload")
     if args.no_overwrite and not args.upload:
         parser.error("--no-overwrite requires --upload")
+    if args.swipe_refid is not None and args.swipe_xpath:
+        parser.error("--swipe-refid and --swipe-xpath cannot be used together")
+    if args.swipe_refid is not None and not args.swipe:
+        parser.error("--swipe-refid requires --swipe")
+    if args.swipe_xpath and not args.swipe:
+        parser.error("--swipe-xpath requires --swipe")
     if args.main_template_file and not args.application_bundle:
         parser.error("--main-template-file requires --application-bundle")
     if args.application_id and not args.application_bundle:
