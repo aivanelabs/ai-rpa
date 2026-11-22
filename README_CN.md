@@ -1,203 +1,70 @@
-# AIVane AI RPA
+# 面向 AI agent 的 AIVane
 
-**官方网站** · [aivane.net](https://aivane.net/)
+英文版见 [README.md](README.md)。**官方网站：**[aivane.net](https://aivane.net/)
 
-几分钟内让桌面端或 AI agent 控制 Android 手机：查看 UI、点击、输入、启动应用、截图，全部通过局域网本地完成。
+这里存放让 AI agent 使用 [AIVane](https://aivane.net/) 的 skill、插件和示例自动化。AIVane 把网页任务变成可复用的无代码自动化：先构建一次（描述任务，或在 AIVane 桌面应用中录制一次），之后就能带着新的输入在 AIVane 云端浏览器或你自己的电脑上再次运行。
 
-这是 `aivanelabs/ai-rpa` 的公开仓库。当前公开面是 **AIVane Android REPL Beta**：一个可直接安装的 `agent-android` CLI，加上一个可从 GitHub 安装的 `agent-android` skill，面向 Codex、Claude Code、OpenClaw 等工具。
+## 选择你的路径
 
-## 演示视频
+| 我想要… | 使用 | 详情 |
+| --- | --- | --- |
+| **① 运行和创建浏览器/桌面自动化**，从 Claude、ChatGPT、Codex、Cursor、Hermes 或 OpenClaw 中 | [`skills/aivane`](skills/aivane/SKILL.md) + AIVane MCP 服务器 `https://app.aivane.net/mcp` | [浏览器和桌面自动化](#浏览器和桌面自动化) |
+| **② 通过局域网控制 Android 手机**（beta） | [`skills/agent-android`](skills/agent-android/SKILL.md) + `agent-android` CLI | [通过局域网控制 Android 手机](#通过局域网控制-android-手机beta) |
 
-### 添加日程
+## 浏览器和桌面自动化
 
-https://github.com/user-attachments/assets/f4e48dd4-386c-4df5-936e-37c3fa650fd4
+典型任务：抓取网站并把数据提取到 CSV、Excel 或 Google Sheets，填写表单，登录门户并下载报表或发票，重复检查价格和库存。通过 AIVane MCP 服务器，agent 可以列出你的自动化、带新输入运行、跟踪运行并读回输出、保存的文件和截图，也可以发起创建新的自动化。
 
-### 小红书搜索
+连接一个 MCP 服务器：
 
-https://github.com/user-attachments/assets/7024b34b-73cd-4cc5-857e-90a84c341110
+- **云端服务器**（任意系统）：`https://app.aivane.net/mcp`（Streamable HTTP，OAuth 登录，免费 AIVane 账号）。
+- **本地桌面服务器**（Windows）：从 [aivane.net/download](https://aivane.net/download) 安装 AIVane，然后在 Settings > AI tools (MCP) 中复制连接配置。
 
-## 从这里开始
+添加 skill，它告诉 agent 如何使用 AIVane MCP 工具：
 
-- 现在已经有现成可安装的 CLI 和 skill 入口，优先使用下面这些命令，不再把仓库内相对路径脚本当作主入口。
-- 下载 APK：[GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
-- 安装 CLI：`uv tool install aivane-agent-android`
-- 安装 skill：`npx skills add aivanelabs/ai-rpa --skill agent-android`
+```bash
+# skills.sh CLI（Codex、Claude Code、Cursor 等 agent）
+npx skills add aivanelabs/ai-rpa --skill aivane
 
-## 3 步跑通
+# Claude Code 插件（skill 加云端 MCP 服务器）；之后运行 /mcp，选择 aivane 并完成认证
+claude plugin marketplace add aivanelabs/ai-rpa
+claude plugin install aivane@aivane
 
-1. 在手机上安装 APK，并开启 AIVane 无障碍服务。
-2. 安装 CLI：
+# Hermes Agent
+hermes skills install aivanelabs/ai-rpa/skills/aivane
+```
+
+Claude（claude.ai、Claude Desktop）、ChatGPT 和 VS Code 在各自的连接器或 MCP 设置中使用同一地址连接。各客户端的配置方法见 [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) 和 [`skills/aivane/SKILL.md`](skills/aivane/SKILL.md)，更多安装方式见 [skills/README.md](skills/README.md)。
+
+## 通过局域网控制 Android 手机（beta）
+
+**AIVane Android REPL Beta** 让桌面端或 AI agent 控制 Android 手机：查看 UI、点击、输入、启动应用、截图，全部通过局域网本地完成。
+
+先从 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) 下载 APK 安装到手机，并开启 AIVane 无障碍服务。然后：
 
 ```bash
 uv tool install aivane-agent-android
-```
-
-如果之后找不到 `agent-android`，先运行：
-
-```bash
-uv tool update-shell
-```
-
-然后重新打开终端。如果你想让当前 Linux shell 立刻生效，可以执行：
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-3. 验证手机可达：
-
-```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android
 agent-android --health --url http://<device-ip>:8080
 ```
 
-如果成功，再启动 REPL：
+包含演示视频、快速上手、REPL 命令、模板上传和校验的完整指南：[docs/android/README_CN.md](docs/android/README_CN.md)。
 
-```bash
-agent-android --repl --url http://<device-ip>:8080
-```
+## 仓库结构
 
-## 选一条路径
+| 路径 | 内容 |
+| --- | --- |
+| [`skills/`](skills/README.md) | 可安装的 agent skill：`aivane/`（通过 MCP 运行浏览器和桌面自动化）和 `agent-android/`（Android 局域网 beta） |
+| [`plugins/`](plugins/aivane/README.md) | Claude Code 插件；`plugins/aivane/` 打包了 `aivane` skill 和云端 MCP 服务器。插件市场文件是 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
+| [`examples/`](examples/README.md) | AIVane 示例自动化（Application），以及 Android smoke flow 和 ADB 启动辅助脚本 |
+| `clients/` | 可发布的 Python 包：[`clients/python/`](clients/python/README.md)（`aivane-agent-android`，命令 `agent-android`）和 [`clients/template-linter/`](clients/template-linter/README.md)（`aivane-template-linter`，命令 `aivane-template-lint`） |
+| `docs/` | [`docs/android/`](docs/android/README_CN.md) Android beta 指南（链接 `docs/` 下的 quickstart、安装、协议、权限、发布文档）；[`docs/templates/`](docs/templates/README.md) 模板编写和校验；[`docs/operation-types/`](docs/operation-types/README.md) OperationType 参考；`docs/assets/` 媒体资源 |
+| `scripts/` | 仓库工具，例如把 `skills/aivane/` 复制进插件的 `sync_plugin_skills.py` |
+| `aivane.apk` | Android REPL beta 的 APK 构建（正式版本见 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)） |
 
-### 给人手动使用
+## 贡献、安全、许可证
 
-如果你想在桌面端手动控制手机，直接用 CLI：
-
-1. 从 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) 下载 APK
-2. 用 `uv tool install aivane-agent-android` 安装 CLI
-3. 运行 `agent-android --repl --url http://<device-ip>:8080`
-4. 在 REPL 中按这个短循环操作：`health` -> `apps` -> `la <package>` -> `list` -> 一个动作 -> `list`
-
-### 给 AI Agent 使用
-
-如果你想让 Codex、Claude Code 或其他 agent 驱动手机：
-
-1. 用 `uv tool install aivane-agent-android` 安装 CLI
-2. 安装 skill：
-
-```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android
-```
-
-3. 给 agent 一个明确任务，例如：
-
-```text
-Use the installed agent-android skill to:
-1. check phone health
-2. list launcher apps
-3. launch Settings
-4. inspect visible UI nodes
-5. tap the Wi-Fi entry
-```
-
-## 第一条成功路径
-
-手机可达后，最短可行的 smoke flow 是：
-
-1. `agent-android --repl --url http://<device-ip>:8080`
-2. `set url http://<device-ip>:8080`
-3. `health`
-4. `apps`
-5. `la <package>`
-6. `list`
-7. `tap <refId>`
-8. `list`
-
-如果你想看完整安装路径，请看 [docs/install-agent-android.md](docs/install-agent-android.md) 和 [docs/quickstart.md](docs/quickstart.md)。
-
-## 在 AI agent 中使用 AIVane
-
-AIVane 还可以为 Claude Code、Codex、Cursor、Hermes、OpenClaw 等 MCP 客户端运行可复用的浏览器自动化（抓取并提取数据到 CSV 或 Google Sheets、填写表单、登录门户并下载文件）。连接 AIVane MCP 服务器 `https://app.aivane.net/mcp`（OAuth 登录，免费账号），或 Windows 版 AIVane 桌面应用的本地服务器，然后添加 [`aivane` skill](skills/aivane/SKILL.md)：
-
-```bash
-npx skills add aivanelabs/ai-rpa --skill aivane
-# 或在 Claude Code 中安装包含 skill 和云端 MCP 服务器的插件：
-claude plugin marketplace add aivanelabs/ai-rpa
-claude plugin install aivane@aivane
-```
-
-各客户端的配置方法见 [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/)，更多安装方式见 [skills/README.md](skills/README.md)。
-
-## 模板和文件同步
-
-如果一个工作流包含一个主模板和多个子模板，优先把目录打成 zip 后作为应用包执行。手机会在这个 zip 的作用域内解析子模板，避免和手机本地同名模板冲突：
-
-```bash
-agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
-```
-
-如果你想把单独的图片、普通二进制文件或一次性本地文件推送到手机端 REPL 可访问的本地路径，可以用 CLI 上传：
-
-```bash
-agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
-```
-
-默认会覆盖目标文件。需要拒绝覆盖时加 `--no-overwrite`。如果文件在某个 URL 上，需要让手机端模板自己下载并保存，请用 `http.download`；它适合图片、JSON 模板、zip、文本文件和其他二进制文件。`http.get` 仍然适合把文本或 JSON 响应读入变量。
-
-## 模板校验
-
-如果你想在真机执行前检查单个模板或 application bundle，可以安装模板 linter：
-
-```bash
-uv tool install aivane-template-linter
-aivane-template-lint my-app -r
-```
-
-它会检查 JSON 格式、OperationType 参数、变量引用，以及 `app.json` 主模板解析、`template.execute` 子模板调用和跨模板参数关系。
-
-模板开发说明见 [docs/templates/](docs/templates/)，OperationType 参考见 [docs/operation-types/](docs/operation-types/)。
-
-## 这个 Beta 是什么
-
-- 基于局域网的本地优先 Android 自动化
-- 既支持人工使用的 REPL，也支持 agent 使用的 skill
-- 对外命令是 `agent-android`
-- 适合 inspect -> act -> inspect 的工作流
-
-## 这个 Beta 不是什么
-
-- 不是云端手机农场
-- 不是默认可跨公网远程控制
-- 不是 iOS 工具
-- 不是可视化录制器工作流
-
-## 为什么让手机本身充当 Web Server
-
-- 手机本地运行轻量 HTTP 服务，电脑直接连接 `http://<device-ip>:8080`
-- UI 读取、点击、输入、截图都留在手机和控制端之间
-- 第一条 smoke flow 不依赖云端中转
-- 当前代价是只支持局域网
-
-## 安装来源
-
-- PyPI 包名：`aivane-agent-android`
-- 对外命令：`agent-android`
-- 模板 linter 包名：`aivane-template-linter`
-- 模板 linter 命令：`aivane-template-lint`
-- Skill：[`skills/agent-android/`](skills/agent-android/)、[`skills/aivane/`](skills/aivane/)
-- APK 下载：[GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
-
-## 仓库内容
-
-- `clients/python/`：采用标准 `src` 布局的可发布 Python CLI 包
-- `clients/template-linter/`：采用标准 `src` 布局的可发布模板校验 CLI 包
-- `docs/`：quickstart、安装、协议、权限、发布说明等文档
-- `docs/templates/`：模板编写、application 结构和 lint 使用说明
-- `docs/operation-types/`：公开 OperationType 参考文档
-- `docs/assets/`：README 引用的演示视频、截图等文档媒体资源
-- `examples/`：smoke flow 和启动辅助脚本
-- `skills/agent-android/`：可安装的公开 skill
-- `skills/aivane/`：AIVane MCP skill；`plugins/aivane/` 与 `.claude-plugin/marketplace.json`：Claude Code 插件市场
-
-## 附加资源
-
-- [docs/quickstart.md](docs/quickstart.md)
-- [docs/install-agent-android.md](docs/install-agent-android.md)
-- [docs/agent-examples.md](docs/agent-examples.md)
-- [docs/templates/README.md](docs/templates/README.md)
-- [docs/operation-types/README.md](docs/operation-types/README.md)
-- [docs/release-checklist.md](docs/release-checklist.md)
-- [docs/known-limitations.md](docs/known-limitations.md)
-
-## 联系方式
-
-如需讨论或协作，请发邮件至 `aivanelabs@gmail.com`。
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [SECURITY.md](SECURITY.md)
+- [LICENSE](LICENSE)（MIT）
+- 支持：`support@aivane.net` · 隐私：[aivane.net/privacy](https://aivane.net/privacy/) · 条款：[aivane.net/terms](https://aivane.net/terms/)

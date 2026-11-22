@@ -1,205 +1,70 @@
-See the Chinese overview at [README_CN.md](README_CN.md).
+# AIVane for AI agents
 
-# AIVane AI RPA
+See the Chinese overview at [README_CN.md](README_CN.md). **Official website:** [aivane.net](https://aivane.net/)
 
-**Official website** · [aivane.net](https://aivane.net/)
+Skills, plugins and example automations that let AI agents use [AIVane](https://aivane.net/). AIVane turns web tasks into reusable, no-code automations: build one once (describe the task or record it once in the AIVane desktop app), then run it again with new inputs in AIVane's cloud browser or on your own computer.
 
-Control an Android phone from your desktop or AI agent in minutes: inspect UI, tap, type, launch apps, and capture screenshots locally over LAN.
+## Choose your path
 
-This repository is the public home for `aivanelabs/ai-rpa`. The current public surface is **AIVane Android REPL Beta**: a directly installable `agent-android` CLI plus a GitHub-installable `agent-android` skill for tools such as Codex, Claude Code, and OpenClaw.
+| I want to... | Use | Details |
+| --- | --- | --- |
+| **① Run and create browser/desktop automations** from Claude, ChatGPT, Codex, Cursor, Hermes or OpenClaw | [`skills/aivane`](skills/aivane/SKILL.md) + the AIVane MCP server `https://app.aivane.net/mcp` | [Browser and desktop automations](#browser-and-desktop-automations) |
+| **② Control an Android phone over LAN** (beta) | [`skills/agent-android`](skills/agent-android/SKILL.md) + the `agent-android` CLI | [Android phone control over LAN](#android-phone-control-over-lan-beta) |
 
-## Demo
+## Browser and desktop automations
 
-### Add a calendar event
+Typical tasks: scraping websites and extracting data to CSV, Excel or Google Sheets, filling forms, signing in to portals and downloading reports or invoices, repeated price and stock checks. Through the AIVane MCP server an agent lists your automations, runs them with new inputs, follows each run and reads back outputs, saved files and a screenshot. It can also start creating a new automation.
 
-https://github.com/user-attachments/assets/f4e48dd4-386c-4df5-936e-37c3fa650fd4
+Connect an MCP server:
 
-### Search on Xiaohongshu
+- **Cloud server** (any OS): `https://app.aivane.net/mcp` (Streamable HTTP, OAuth sign-in, free AIVane account).
+- **Local desktop server** (Windows): install AIVane from [aivane.net/download](https://aivane.net/download), then copy the connection setup from Settings > AI tools (MCP).
 
-https://github.com/user-attachments/assets/7024b34b-73cd-4cc5-857e-90a84c341110
+Add the skill, which tells the agent how to use the AIVane MCP tools:
 
-## Start Here
+```bash
+# skills.sh CLI (Codex, Claude Code, Cursor and other agents)
+npx skills add aivanelabs/ai-rpa --skill aivane
 
-- The beta already has a ready-to-install CLI and skill path; use the commands below instead of repo-local script paths.
-- Download APK: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
-- Install CLI: `uv tool install aivane-agent-android`
-- Install skill: `npx skills add aivanelabs/ai-rpa --skill agent-android`
+# Claude Code plugin (skill plus the cloud MCP server); then run /mcp, select aivane and authenticate
+claude plugin marketplace add aivanelabs/ai-rpa
+claude plugin install aivane@aivane
 
-## 3-Step Quickstart
+# Hermes Agent
+hermes skills install aivanelabs/ai-rpa/skills/aivane
+```
 
-1. Install the APK on your phone and enable the AIVane accessibility service.
-2. Install the CLI:
+Claude (claude.ai, Claude Desktop), ChatGPT and VS Code connect from their own connector or MCP settings with the same address. Setup for each client: [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) and [`skills/aivane/SKILL.md`](skills/aivane/SKILL.md). More install options: [skills/README.md](skills/README.md).
+
+## Android phone control over LAN (beta)
+
+**AIVane Android REPL Beta** controls an Android phone from your desktop or AI agent: inspect UI, tap, type, launch apps, and capture screenshots locally over LAN.
+
+First install the APK from [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) on the phone and enable the AIVane accessibility service. Then:
 
 ```bash
 uv tool install aivane-agent-android
-```
-
-If `agent-android` is not found afterwards, run:
-
-```bash
-uv tool update-shell
-```
-
-Then reopen the terminal. If you want the current shell to work immediately on Linux, run:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-3. Verify the device is reachable:
-
-```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android
 agent-android --health --url http://<device-ip>:8080
 ```
 
-If that succeeds, start the REPL:
+Full guide with demos, quickstart, REPL commands, template upload and validation: [docs/android/README.md](docs/android/README.md).
 
-```bash
-agent-android --repl --url http://<device-ip>:8080
-```
+## Repository layout
 
-## Choose A Path
+| Path | Contents |
+| --- | --- |
+| [`skills/`](skills/README.md) | Installable agent skills: `aivane/` (browser and desktop automations via MCP) and `agent-android/` (Android LAN beta) |
+| [`plugins/`](plugins/aivane/README.md) | Claude Code plugins; `plugins/aivane/` bundles the `aivane` skill and the cloud MCP server. The marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
+| [`examples/`](examples/README.md) | Example AIVane automations (Applications), plus the Android smoke flow and ADB launch helpers |
+| `clients/` | Publishable Python packages: [`clients/python/`](clients/python/README.md) (`aivane-agent-android`, command `agent-android`) and [`clients/template-linter/`](clients/template-linter/README.md) (`aivane-template-linter`, command `aivane-template-lint`) |
+| `docs/` | [`docs/android/`](docs/android/README.md) Android beta guide (it links the quickstart, install, protocol, permissions and release docs in `docs/`); [`docs/templates/`](docs/templates/README.md) template authoring and linting; [`docs/operation-types/`](docs/operation-types/README.md) OperationType reference; `docs/assets/` media |
+| `scripts/` | Repository tooling, for example `sync_plugin_skills.py`, which copies `skills/aivane/` into the plugin |
+| `aivane.apk` | Android REPL beta APK build (releases are on [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)) |
 
-### For Humans
+## Contributing, security, license
 
-Use the CLI directly when you want to manually explore the phone from your desktop:
-
-1. Download the APK from [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
-2. Install the CLI with `uv tool install aivane-agent-android`
-3. Run `agent-android --repl --url http://<device-ip>:8080`
-4. In the REPL, use the short loop: `health` -> `apps` -> `la <package>` -> `list` -> one action -> `list`
-
-### For AI Agents
-
-Use the skill when you want Codex, Claude Code, or another coding agent to drive the phone:
-
-1. Install the CLI with `uv tool install aivane-agent-android`
-2. Install the skill:
-
-```bash
-npx skills add aivanelabs/ai-rpa --skill agent-android
-```
-
-3. Give the agent a concrete task, for example:
-
-```text
-Use the installed agent-android skill to:
-1. check phone health
-2. list launcher apps
-3. launch Settings
-4. inspect visible UI nodes
-5. tap the Wi-Fi entry
-```
-
-## First Success Path
-
-This is the shortest practical smoke flow after the phone is reachable:
-
-1. `agent-android --repl --url http://<device-ip>:8080`
-2. `set url http://<device-ip>:8080`
-3. `health`
-4. `apps`
-5. `la <package>`
-6. `list`
-7. `tap <refId>`
-8. `list`
-
-If you want the full setup path, see [docs/install-agent-android.md](docs/install-agent-android.md) and [docs/quickstart.md](docs/quickstart.md).
-
-## Use AIVane From AI Agents
-
-AIVane also runs reusable browser automations (scraping and data extraction to CSV or Google Sheets, form filling, portal sign-in and downloads) for Claude Code, Codex, Cursor, Hermes, OpenClaw and other MCP clients. Connect the AIVane MCP server `https://app.aivane.net/mcp` (OAuth, free account) or the local server of the AIVane desktop app for Windows, then add the [`aivane` skill](skills/aivane/SKILL.md):
-
-```bash
-npx skills add aivanelabs/ai-rpa --skill aivane
-# or, in Claude Code, the plugin with the skill and the cloud MCP server:
-claude plugin marketplace add aivanelabs/ai-rpa
-claude plugin install aivane@aivane
-```
-
-Setup for each client: [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/). More install options: [skills/README.md](skills/README.md).
-
-## Template And File Sync
-
-Use an application bundle when a workflow has one main template plus child templates. The phone executes the zip as one scoped package, so child template names do not collide with phone-local templates:
-
-```bash
-agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
-```
-
-Use the CLI upload command when you want to push a standalone image, ordinary binary file, or one-off local file from your computer to phone-local REPL storage:
-
-```bash
-agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
-```
-
-Uploads overwrite by default. Add `--no-overwrite` to reject an existing target. In templates, use `http.download` when the phone should fetch and save an image, JSON template, zip, text file, or other binary file from a URL. Keep `http.get` for text or JSON responses that should be read into variables.
-
-## Template Validation
-
-Install the template linter when you want to check a template or application bundle before running it on a device:
-
-```bash
-uv tool install aivane-template-linter
-aivane-template-lint my-app -r
-```
-
-The linter validates template JSON, OperationType parameters, variable references, and application-level relationships such as `app.json` main template resolution and `template.execute` child template calls.
-
-See [docs/templates/](docs/templates/) for authoring guidance and [docs/operation-types/](docs/operation-types/) for the OperationType reference.
-
-## What This Beta Is
-
-- Local-first Android automation over LAN
-- Human-friendly REPL plus agent-friendly skill
-- Public CLI command: `agent-android`
-- Designed for inspect -> act -> inspect workflows
-
-## What This Beta Is Not
-
-- Not a cloud phone farm
-- Not remote control over arbitrary networks by default
-- Not iOS support
-- Not a visual recorder workflow yet
-
-## Why The Phone Is The Web Server
-
-- The phone runs the lightweight HTTP service locally and the desktop connects directly to `http://<device-ip>:8080`.
-- UI inspection, taps, text input, and screenshots stay between the phone and the controlling machine.
-- The first smoke flow works without a cloud relay.
-- The tradeoff is that this beta is LAN-only.
-
-## Install Sources
-
-- PyPI package: `aivane-agent-android`
-- Console command: `agent-android`
-- Template linter package: `aivane-template-linter`
-- Template linter command: `aivane-template-lint`
-- Skills: [`skills/agent-android/`](skills/agent-android/), [`skills/aivane/`](skills/aivane/)
-- APK builds: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
-
-## Repo Layout
-
-- `clients/python/`: publishable Python CLI package using a standard `src` layout
-- `clients/template-linter/`: publishable Python template linting CLI package
-- `docs/`: quickstart, install, protocol, permissions, release, and support docs
-- `docs/templates/`: template authoring and linting guidance
-- `docs/operation-types/`: public OperationType reference
-- `docs/assets/`: README-linked media such as demo videos and screenshots
-- `examples/`: smoke-flow examples and launch helpers
-- `skills/agent-android/`: installable public skill definition
-- `skills/aivane/`: AIVane MCP skill; `plugins/aivane/` and `.claude-plugin/marketplace.json`: Claude Code plugin marketplace
-
-## Additional Resources
-
-- [docs/quickstart.md](docs/quickstart.md)
-- [docs/install-agent-android.md](docs/install-agent-android.md)
-- [docs/agent-examples.md](docs/agent-examples.md)
-- [docs/templates/README.md](docs/templates/README.md)
-- [docs/operation-types/README.md](docs/operation-types/README.md)
-- [docs/release-checklist.md](docs/release-checklist.md)
-- [docs/known-limitations.md](docs/known-limitations.md)
-
-## Contact
-
-For questions and light coordination, please email `aivanelabs@gmail.com`.
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [SECURITY.md](SECURITY.md)
+- [LICENSE](LICENSE) (MIT)
+- Support: `support@aivane.net` · Privacy: [aivane.net/privacy](https://aivane.net/privacy/) · Terms: [aivane.net/terms](https://aivane.net/terms/)

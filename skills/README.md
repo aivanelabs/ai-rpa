@@ -1,17 +1,13 @@
 # Skills
 
-This directory holds public skills for the `aivanelabs/ai-rpa` GitHub beta.
+Installable agent skills from `aivanelabs/ai-rpa`. Each skill lives in its own directory with a `SKILL.md`.
 
-## Current Skills
+| Skill | Who it is for | What it needs |
+| --- | --- | --- |
+| [`aivane/`](aivane/SKILL.md) | Anyone who wants an AI agent (Claude, ChatGPT, Codex, Cursor, Hermes, OpenClaw and other MCP clients) to run, follow and create AIVane browser and desktop automations: scraping and data extraction to CSV, Excel or Google Sheets, form filling, portal sign-in and downloads | The AIVane MCP server: cloud `https://app.aivane.net/mcp` (OAuth, free account) or the local server of the AIVane desktop app for Windows |
+| [`agent-android/`](agent-android/SKILL.md) | Developers who want an agent or a terminal to control an Android phone over LAN (beta): launcher app discovery, launch, inspect, and stepwise interaction | The installed `agent-android` CLI and the AIVane Android REPL APK on a phone in the same network ([guide](../docs/android/README.md)) |
 
-- `aivane/`
-  - Run, follow and create AIVane browser and desktop automations from an AI agent
-  - Uses the AIVane MCP server: cloud `https://app.aivane.net/mcp` (OAuth, free account) or the local server of the AIVane desktop app for Windows
-  - Also published as a Claude Code plugin (`plugins/aivane/`, marketplace `.claude-plugin/marketplace.json`) that bundles the skill and the cloud MCP server
-- `agent-android/`
-  - Public Android phone control REPL skill
-  - Uses the installed `agent-android` CLI
-  - Focuses on LAN connectivity, launcher app discovery, launch, inspect, and stepwise interaction
+`aivane` is also published as a Claude Code plugin (`plugins/aivane/`, marketplace `.claude-plugin/marketplace.json`) that bundles the skill and the cloud MCP server.
 
 ## Install the `aivane` skill
 

@@ -1,0 +1,179 @@
+# Android phone control over LAN (beta)
+
+See the Chinese version at [README_CN.md](README_CN.md).
+
+**AIVane Android REPL Beta** lets you control an Android phone from your desktop or AI agent: inspect UI, tap, type, launch apps, and capture screenshots locally over LAN.
+
+It consists of a directly installable `agent-android` CLI plus a GitHub-installable [`agent-android` skill](../../skills/agent-android/SKILL.md) for tools such as Codex, Claude Code, and OpenClaw.
+
+For browser and desktop automations from AI agents, use the [`aivane` skill](../../skills/aivane/SKILL.md) instead.
+
+## Demo
+
+### Add a calendar event
+
+https://github.com/user-attachments/assets/f4e48dd4-386c-4df5-936e-37c3fa650fd4
+
+### Search on Xiaohongshu
+
+https://github.com/user-attachments/assets/7024b34b-73cd-4cc5-857e-90a84c341110
+
+## Start Here
+
+- The beta already has a ready-to-install CLI and skill path; use the commands below instead of repo-local script paths.
+- Download APK: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases) (an `aivane.apk` build is also checked in at the repository root)
+- Install CLI: `uv tool install aivane-agent-android`
+- Install skill: `npx skills add aivanelabs/ai-rpa --skill agent-android`
+
+## 3-Step Quickstart
+
+1. Install the APK on your phone and enable the AIVane accessibility service.
+2. Install the CLI:
+
+```bash
+uv tool install aivane-agent-android
+```
+
+If `agent-android` is not found afterwards, run:
+
+```bash
+uv tool update-shell
+```
+
+Then reopen the terminal. If you want the current shell to work immediately on Linux, run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+3. Verify the device is reachable:
+
+```bash
+agent-android --health --url http://<device-ip>:8080
+```
+
+If that succeeds, start the REPL:
+
+```bash
+agent-android --repl --url http://<device-ip>:8080
+```
+
+## Choose A Path
+
+### For Humans
+
+Use the CLI directly when you want to manually explore the phone from your desktop:
+
+1. Download the APK from [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
+2. Install the CLI with `uv tool install aivane-agent-android`
+3. Run `agent-android --repl --url http://<device-ip>:8080`
+4. In the REPL, use the short loop: `health` -> `apps` -> `la <package>` -> `list` -> one action -> `list`
+
+### For AI Agents
+
+Use the skill when you want Codex, Claude Code, or another coding agent to drive the phone:
+
+1. Install the CLI with `uv tool install aivane-agent-android`
+2. Install the skill:
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill agent-android
+```
+
+3. Give the agent a concrete task, for example:
+
+```text
+Use the installed agent-android skill to:
+1. check phone health
+2. list launcher apps
+3. launch Settings
+4. inspect visible UI nodes
+5. tap the Wi-Fi entry
+```
+
+## First Success Path
+
+This is the shortest practical smoke flow after the phone is reachable:
+
+1. `agent-android --repl --url http://<device-ip>:8080`
+2. `set url http://<device-ip>:8080`
+3. `health`
+4. `apps`
+5. `la <package>`
+6. `list`
+7. `tap <refId>`
+8. `list`
+
+If you want the full setup path, see [install-agent-android.md](../install-agent-android.md) and [quickstart.md](../quickstart.md).
+
+## Template And File Sync
+
+Use an application bundle when a workflow has one main template plus child templates. The phone executes the zip as one scoped package, so child template names do not collide with phone-local templates:
+
+```bash
+agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
+```
+
+Use the CLI upload command when you want to push a standalone image, ordinary binary file, or one-off local file from your computer to phone-local REPL storage:
+
+```bash
+agent-android --upload foo.json --remote-path Templates/foo.json --url http://<device-ip>:8080
+```
+
+Uploads overwrite by default. Add `--no-overwrite` to reject an existing target. In templates, use `http.download` when the phone should fetch and save an image, JSON template, zip, text file, or other binary file from a URL. Keep `http.get` for text or JSON responses that should be read into variables.
+
+## Template Validation
+
+Install the template linter when you want to check a template or application bundle before running it on a device:
+
+```bash
+uv tool install aivane-template-linter
+aivane-template-lint my-app -r
+```
+
+The linter validates template JSON, OperationType parameters, variable references, and application-level relationships such as `app.json` main template resolution and `template.execute` child template calls.
+
+See [docs/templates/](../templates/README.md) for authoring guidance and [docs/operation-types/](../operation-types/README.md) for the OperationType reference.
+
+## What This Beta Is
+
+- Local-first Android automation over LAN
+- Human-friendly REPL plus agent-friendly skill
+- Public CLI command: `agent-android`
+- Designed for inspect -> act -> inspect workflows
+
+## What This Beta Is Not
+
+- Not a cloud phone farm
+- Not remote control over arbitrary networks by default
+- Not iOS support
+- Not a visual recorder workflow yet
+
+## Why The Phone Is The Web Server
+
+- The phone runs the lightweight HTTP service locally and the desktop connects directly to `http://<device-ip>:8080`.
+- UI inspection, taps, text input, and screenshots stay between the phone and the controlling machine.
+- The first smoke flow works without a cloud relay.
+- The tradeoff is that this beta is LAN-only.
+
+## Install Sources
+
+- PyPI package: `aivane-agent-android`
+- Console command: `agent-android`
+- Template linter package: `aivane-template-linter`
+- Template linter command: `aivane-template-lint`
+- Skill: [`skills/agent-android/`](../../skills/agent-android/SKILL.md)
+- APK builds: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
+
+## Android Docs
+
+- [Quickstart](../quickstart.md)
+- [Install guide](../install-agent-android.md)
+- [Agent examples](../agent-examples.md)
+- [Public protocol v1](../protocol-v1.md)
+- [Permissions](../permissions.md)
+- [Known limitations](../known-limitations.md)
+- [Release checklist](../release-checklist.md)
+- [Smoke flow](../../examples/smoke-flow.md) and the ADB launch helpers [`start-app-repl.sh`](../../examples/start-app-repl.sh) / [`start-app-repl.ps1`](../../examples/start-app-repl.ps1)
+
+These files stay at their existing paths under `docs/` because the published `agent-android` skill links to them.
