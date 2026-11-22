@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aivane": {
+      "type": "http",
+      "url": "https://app.aivane.net/mcp"
+    }
+  }
+}

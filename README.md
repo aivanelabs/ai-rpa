@@ -106,6 +106,19 @@ This is the shortest practical smoke flow after the phone is reachable:
 
 If you want the full setup path, see [docs/install-agent-android.md](docs/install-agent-android.md) and [docs/quickstart.md](docs/quickstart.md).
 
+## Use AIVane From AI Agents
+
+AIVane also runs reusable browser automations (scraping and data extraction to CSV or Google Sheets, form filling, portal sign-in and downloads) for Claude Code, Codex, Cursor, Hermes, OpenClaw and other MCP clients. Connect the AIVane MCP server `https://app.aivane.net/mcp` (OAuth, free account) or the local server of the AIVane desktop app for Windows, then add the [`aivane` skill](skills/aivane/SKILL.md):
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill aivane
+# or, in Claude Code, the plugin with the skill and the cloud MCP server:
+claude plugin marketplace add aivanelabs/ai-rpa
+claude plugin install aivane@aivane
+```
+
+Setup for each client: [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/). More install options: [skills/README.md](skills/README.md).
+
 ## Template And File Sync
 
 Use an application bundle when a workflow has one main template plus child templates. The phone executes the zip as one scoped package, so child template names do not collide with phone-local templates:
@@ -162,7 +175,7 @@ See [docs/templates/](docs/templates/) for authoring guidance and [docs/operatio
 - Console command: `agent-android`
 - Template linter package: `aivane-template-linter`
 - Template linter command: `aivane-template-lint`
-- Skill: [`skills/agent-android/`](skills/agent-android/)
+- Skills: [`skills/agent-android/`](skills/agent-android/), [`skills/aivane/`](skills/aivane/)
 - APK builds: [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 
 ## Repo Layout
@@ -175,6 +188,7 @@ See [docs/templates/](docs/templates/) for authoring guidance and [docs/operatio
 - `docs/assets/`: README-linked media such as demo videos and screenshots
 - `examples/`: smoke-flow examples and launch helpers
 - `skills/agent-android/`: installable public skill definition
+- `skills/aivane/`: AIVane MCP skill; `plugins/aivane/` and `.claude-plugin/marketplace.json`: Claude Code plugin marketplace
 
 ## Additional Resources
 

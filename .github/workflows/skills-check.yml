@@ -1,0 +1,38 @@
+name: Skills Check
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "scripts/sync_plugin_skills.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "skills/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "scripts/sync_plugin_skills.py"
+
+jobs:
+  plugin-skill-copies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate plugin JSON
+        run: |
+          for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json plugins/*/.mcp.json; do
+            python -m json.tool "$f" > /dev/null
+          done
+
+      - name: Check generated plugin skill copies
+        run: python scripts/sync_plugin_skills.py --check

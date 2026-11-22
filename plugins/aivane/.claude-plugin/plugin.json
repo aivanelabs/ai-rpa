@@ -1,0 +1,25 @@
+{
+  "name": "aivane",
+  "displayName": "AIVane",
+  "version": "1.0.0",
+  "description": "Run reusable browser automations from Claude Code: scrape websites, extract data, fill forms, sign in to portals and download files. Connects the AIVane cloud MCP server and adds a skill for running and creating automations.",
+  "author": {
+    "name": "AIVane",
+    "email": "support@aivane.net",
+    "url": "https://aivane.net"
+  },
+  "homepage": "https://aivane.net/docs/ai-tools/",
+  "repository": "https://github.com/aivanelabs/ai-rpa",
+  "license": "MIT",
+  "keywords": [
+    "browser-automation",
+    "web-scraping",
+    "data-extraction",
+    "form-filling",
+    "rpa",
+    "mcp"
+  ],
+  "documentationUrl": "https://aivane.net/docs/ai-tools/",
+  "privacyPolicyUrl": "https://aivane.net/privacy/",
+  "termsOfServiceUrl": "https://aivane.net/terms/"
+}

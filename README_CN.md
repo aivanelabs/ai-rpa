@@ -104,6 +104,19 @@ Use the installed agent-android skill to:
 
 如果你想看完整安装路径，请看 [docs/install-agent-android.md](docs/install-agent-android.md) 和 [docs/quickstart.md](docs/quickstart.md)。
 
+## 在 AI agent 中使用 AIVane
+
+AIVane 还可以为 Claude Code、Codex、Cursor、Hermes、OpenClaw 等 MCP 客户端运行可复用的浏览器自动化（抓取并提取数据到 CSV 或 Google Sheets、填写表单、登录门户并下载文件）。连接 AIVane MCP 服务器 `https://app.aivane.net/mcp`（OAuth 登录，免费账号），或 Windows 版 AIVane 桌面应用的本地服务器，然后添加 [`aivane` skill](skills/aivane/SKILL.md)：
+
+```bash
+npx skills add aivanelabs/ai-rpa --skill aivane
+# 或在 Claude Code 中安装包含 skill 和云端 MCP 服务器的插件：
+claude plugin marketplace add aivanelabs/ai-rpa
+claude plugin install aivane@aivane
+```
+
+各客户端的配置方法见 [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/)，更多安装方式见 [skills/README.md](skills/README.md)。
+
 ## 模板和文件同步
 
 如果一个工作流包含一个主模板和多个子模板，优先把目录打成 zip 后作为应用包执行。手机会在这个 zip 的作用域内解析子模板，避免和手机本地同名模板冲突：
@@ -160,7 +173,7 @@ aivane-template-lint my-app -r
 - 对外命令：`agent-android`
 - 模板 linter 包名：`aivane-template-linter`
 - 模板 linter 命令：`aivane-template-lint`
-- Skill：[`skills/agent-android/`](skills/agent-android/)
+- Skill：[`skills/agent-android/`](skills/agent-android/)、[`skills/aivane/`](skills/aivane/)
 - APK 下载：[GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)
 
 ## 仓库内容
@@ -173,6 +186,7 @@ aivane-template-lint my-app -r
 - `docs/assets/`：README 引用的演示视频、截图等文档媒体资源
 - `examples/`：smoke flow 和启动辅助脚本
 - `skills/agent-android/`：可安装的公开 skill
+- `skills/aivane/`：AIVane MCP skill；`plugins/aivane/` 与 `.claude-plugin/marketplace.json`：Claude Code 插件市场
 
 ## 附加资源
 
