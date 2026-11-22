@@ -6,7 +6,7 @@
 
 它包括一个可直接安装的 `agent-android` CLI，加上一个可从 GitHub 安装的 [`agent-android` skill](../../skills/agent-android/SKILL.md)，面向 Codex、Claude Code、OpenClaw 等工具。
 
-如果要在 AI agent 中运行浏览器和桌面自动化，请改用 [`aivane` skill](../../skills/aivane/SKILL.md)。
+如果要在 AI agent 中运行浏览器和桌面自动化，请改用 [`computer-automation` skill](../../skills/computer-automation/SKILL.md)。
 
 ## 演示视频
 

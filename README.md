@@ -8,7 +8,7 @@ Skills, plugins and example automations that let AI agents use [AIVane](https://
 
 | I want to... | Use | Details |
 | --- | --- | --- |
-| **① Run and create browser/desktop automations** from Claude, ChatGPT, Codex, Cursor, Hermes or OpenClaw | [`skills/aivane`](skills/aivane/SKILL.md) + the AIVane MCP server `https://app.aivane.net/mcp` | [Browser and desktop automations](#browser-and-desktop-automations) |
+| **① Run and create browser/desktop automations** from Claude, ChatGPT, Codex, Cursor, Hermes or OpenClaw | [`skills/computer-automation`](skills/computer-automation/SKILL.md) + the AIVane MCP server `https://app.aivane.net/mcp` | [Browser and desktop automations](#browser-and-desktop-automations) |
 | **② Control an Android phone over LAN** (beta) | [`skills/agent-android`](skills/agent-android/SKILL.md) + the `agent-android` CLI | [Android phone control over LAN](#android-phone-control-over-lan-beta) |
 
 ## Browser and desktop automations
@@ -24,17 +24,17 @@ Add the skill, which tells the agent how to use the AIVane MCP tools:
 
 ```bash
 # skills.sh CLI (Codex, Claude Code, Cursor and other agents)
-npx skills add aivanelabs/ai-rpa --skill aivane
+npx skills add aivanelabs/ai-rpa --skill computer-automation
 
 # Claude Code plugin (skill plus the cloud MCP server); then run /mcp, select aivane and authenticate
 claude plugin marketplace add aivanelabs/ai-rpa
 claude plugin install aivane@aivane
 
 # Hermes Agent
-hermes skills install aivanelabs/ai-rpa/skills/aivane
+hermes skills install aivanelabs/ai-rpa/skills/computer-automation
 ```
 
-Claude (claude.ai, Claude Desktop), ChatGPT and VS Code connect from their own connector or MCP settings with the same address. Setup for each client: [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) and [`skills/aivane/SKILL.md`](skills/aivane/SKILL.md). More install options: [skills/README.md](skills/README.md).
+Claude (claude.ai, Claude Desktop), ChatGPT and VS Code connect from their own connector or MCP settings with the same address. Setup for each client: [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) and [`skills/computer-automation/SKILL.md`](skills/computer-automation/SKILL.md). More install options: [skills/README.md](skills/README.md).
 
 ## Android phone control over LAN (beta)
 
@@ -54,12 +54,12 @@ Full guide with demos, quickstart, REPL commands, template upload and validation
 
 | Path | Contents |
 | --- | --- |
-| [`skills/`](skills/README.md) | Installable agent skills: `aivane/` (browser and desktop automations via MCP) and `agent-android/` (Android LAN beta) |
-| [`plugins/`](plugins/aivane/README.md) | Claude Code plugins; `plugins/aivane/` bundles the `aivane` skill and the cloud MCP server. The marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
+| [`skills/`](skills/README.md) | Installable agent skills: `computer-automation/` (browser and desktop automations via MCP) and `agent-android/` (Android LAN beta) |
+| [`plugins/`](plugins/aivane/README.md) | Claude Code plugins; `plugins/aivane/` bundles the `computer-automation` skill and the cloud MCP server. The marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
 | [`examples/`](examples/README.md) | Example AIVane automations (Applications), plus the Android smoke flow and ADB launch helpers |
 | `clients/` | Publishable Python packages: [`clients/python/`](clients/python/README.md) (`aivane-agent-android`, command `agent-android`) and [`clients/template-linter/`](clients/template-linter/README.md) (`aivane-template-linter`, command `aivane-template-lint`) |
 | `docs/` | [`docs/android/`](docs/android/README.md) Android beta guide (it links the quickstart, install, protocol, permissions and release docs in `docs/`); [`docs/templates/`](docs/templates/README.md) template authoring and linting; [`docs/operation-types/`](docs/operation-types/README.md) OperationType reference; `docs/assets/` media |
-| `scripts/` | Repository tooling, for example `sync_plugin_skills.py`, which copies `skills/aivane/` into the plugin |
+| `scripts/` | Repository tooling, for example `sync_plugin_skills.py`, which copies `skills/computer-automation/` into the plugin |
 | `aivane.apk` | Android REPL beta APK build (releases are on [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)) |
 
 ## Contributing, security, license

@@ -8,7 +8,7 @@
 
 | 我想要… | 使用 | 详情 |
 | --- | --- | --- |
-| **① 运行和创建浏览器/桌面自动化**，从 Claude、ChatGPT、Codex、Cursor、Hermes 或 OpenClaw 中 | [`skills/aivane`](skills/aivane/SKILL.md) + AIVane MCP 服务器 `https://app.aivane.net/mcp` | [浏览器和桌面自动化](#浏览器和桌面自动化) |
+| **① 运行和创建浏览器/桌面自动化**，从 Claude、ChatGPT、Codex、Cursor、Hermes 或 OpenClaw 中 | [`skills/computer-automation`](skills/computer-automation/SKILL.md) + AIVane MCP 服务器 `https://app.aivane.net/mcp` | [浏览器和桌面自动化](#浏览器和桌面自动化) |
 | **② 通过局域网控制 Android 手机**（beta） | [`skills/agent-android`](skills/agent-android/SKILL.md) + `agent-android` CLI | [通过局域网控制 Android 手机](#通过局域网控制-android-手机beta) |
 
 ## 浏览器和桌面自动化
@@ -24,17 +24,17 @@
 
 ```bash
 # skills.sh CLI（Codex、Claude Code、Cursor 等 agent）
-npx skills add aivanelabs/ai-rpa --skill aivane
+npx skills add aivanelabs/ai-rpa --skill computer-automation
 
 # Claude Code 插件（skill 加云端 MCP 服务器）；之后运行 /mcp，选择 aivane 并完成认证
 claude plugin marketplace add aivanelabs/ai-rpa
 claude plugin install aivane@aivane
 
 # Hermes Agent
-hermes skills install aivanelabs/ai-rpa/skills/aivane
+hermes skills install aivanelabs/ai-rpa/skills/computer-automation
 ```
 
-Claude（claude.ai、Claude Desktop）、ChatGPT 和 VS Code 在各自的连接器或 MCP 设置中使用同一地址连接。各客户端的配置方法见 [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) 和 [`skills/aivane/SKILL.md`](skills/aivane/SKILL.md)，更多安装方式见 [skills/README.md](skills/README.md)。
+Claude（claude.ai、Claude Desktop）、ChatGPT 和 VS Code 在各自的连接器或 MCP 设置中使用同一地址连接。各客户端的配置方法见 [aivane.net/docs/ai-tools](https://aivane.net/docs/ai-tools/) 和 [`skills/computer-automation/SKILL.md`](skills/computer-automation/SKILL.md)，更多安装方式见 [skills/README.md](skills/README.md)。
 
 ## 通过局域网控制 Android 手机（beta）
 
@@ -54,12 +54,12 @@ agent-android --health --url http://<device-ip>:8080
 
 | 路径 | 内容 |
 | --- | --- |
-| [`skills/`](skills/README.md) | 可安装的 agent skill：`aivane/`（通过 MCP 运行浏览器和桌面自动化）和 `agent-android/`（Android 局域网 beta） |
-| [`plugins/`](plugins/aivane/README.md) | Claude Code 插件；`plugins/aivane/` 打包了 `aivane` skill 和云端 MCP 服务器。插件市场文件是 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
+| [`skills/`](skills/README.md) | 可安装的 agent skill：`computer-automation/`（通过 MCP 运行浏览器和桌面自动化）和 `agent-android/`（Android 局域网 beta） |
+| [`plugins/`](plugins/aivane/README.md) | Claude Code 插件；`plugins/aivane/` 打包了 `computer-automation` skill 和云端 MCP 服务器。插件市场文件是 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) |
 | [`examples/`](examples/README.md) | AIVane 示例自动化（Application），以及 Android smoke flow 和 ADB 启动辅助脚本 |
 | `clients/` | 可发布的 Python 包：[`clients/python/`](clients/python/README.md)（`aivane-agent-android`，命令 `agent-android`）和 [`clients/template-linter/`](clients/template-linter/README.md)（`aivane-template-linter`，命令 `aivane-template-lint`） |
 | `docs/` | [`docs/android/`](docs/android/README_CN.md) Android beta 指南（链接 `docs/` 下的 quickstart、安装、协议、权限、发布文档）；[`docs/templates/`](docs/templates/README.md) 模板编写和校验；[`docs/operation-types/`](docs/operation-types/README.md) OperationType 参考；`docs/assets/` 媒体资源 |
-| `scripts/` | 仓库工具，例如把 `skills/aivane/` 复制进插件的 `sync_plugin_skills.py` |
+| `scripts/` | 仓库工具，例如把 `skills/computer-automation/` 复制进插件的 `sync_plugin_skills.py` |
 | `aivane.apk` | Android REPL beta 的 APK 构建（正式版本见 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)） |
 
 ## 贡献、安全、许可证

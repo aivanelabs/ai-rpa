@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # (source skill directory, generated copy inside a plugin)
 COPIES = [
-    (REPO_ROOT / "skills" / "aivane", REPO_ROOT / "plugins" / "aivane" / "skills" / "aivane"),
+    (REPO_ROOT / "skills" / "computer-automation", REPO_ROOT / "plugins" / "aivane" / "skills" / "computer-automation"),
 ]
 
 

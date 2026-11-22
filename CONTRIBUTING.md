@@ -7,7 +7,7 @@ Thank you for helping shape the public `aivanelabs/ai-rpa` experience!
 - Improvements to the Python `clients/python/` package and `agent-android` CLI surface
 - Enhancements and clarifications to the `docs/` quickstart, protocol, and smoke guidance
 - Example AIVane automations (Applications) and Android smoke sequences under `examples/`
-- Skills under `skills/` (`aivane`, `agent-android`) and Claude Code plugins under `plugins/`; edit `skills/aivane/` and run `python scripts/sync_plugin_skills.py` instead of editing the plugin copy
+- Skills under `skills/` (`computer-automation`, `agent-android`) and Claude Code plugins under `plugins/`; edit `skills/computer-automation/` and run `python scripts/sync_plugin_skills.py` instead of editing the plugin copy
 
 ## How to contribute
 

@@ -6,7 +6,7 @@ See the Chinese version at [README_CN.md](README_CN.md).
 
 It consists of a directly installable `agent-android` CLI plus a GitHub-installable [`agent-android` skill](../../skills/agent-android/SKILL.md) for tools such as Codex, Claude Code, and OpenClaw.
 
-For browser and desktop automations from AI agents, use the [`aivane` skill](../../skills/aivane/SKILL.md) instead.
+For browser and desktop automations from AI agents, use the [`computer-automation` skill](../../skills/computer-automation/SKILL.md) instead.
 
 ## Demo
 
