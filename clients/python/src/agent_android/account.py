@@ -10,7 +10,7 @@ import re
 import secrets
 import time
 import webbrowser
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.error import HTTPError, URLError
@@ -331,7 +331,32 @@ def sign_in(url: str | None) -> None:
     })
     session = _session_from_grant(server, result, start)
     with _session_lock():
+        with suppress(AccountError):
+            previous = AccountSession.load()
+            if previous is not None and (
+                previous.server != session.server or previous.binding["deviceSessionId"] != session.binding["deviceSessionId"]
+            ):
+                _revoke_session(previous)
         session._store()
+
+
+def _revoke_session(session: AccountSession) -> None:
+    try:
+        session = session._refresh_if_expired()
+        session_id = session.binding["deviceSessionId"]
+        result = AccountAPI(session.server, session.token).request(
+            "POST", f"/api/account/sessions/{session_id}/revoke", {},
+        )
+        if result.get("revoked") is not True:
+            raise AccountError("The server did not confirm session revocation.")
+    except _SessionRejected:
+        if session.refresh_token is None:
+            raise AccountError("Revoke this session from your account settings. The stored sign-in cannot renew.") from None
+        result = AccountAPI(session.server).request(
+            "POST", "/api/auth/device/session-status", {"refresh_token": session.refresh_token},
+        )
+        if result.get("status") not in ("revoked", "expired"):
+            raise AccountError("The server did not confirm session revocation.") from None
 
 
 def sign_out() -> None:
@@ -339,20 +364,5 @@ def sign_out() -> None:
         session = AccountSession.load()
         if session is None:
             return
-        try:
-            session = session._refresh_if_expired()
-            session_id = session.binding["deviceSessionId"]
-            result = AccountAPI(session.server, session.token).request(
-                "POST", f"/api/account/sessions/{session_id}/revoke", {},
-            )
-            if result.get("revoked") is not True:
-                raise AccountError("The server did not confirm session revocation.")
-        except _SessionRejected:
-            if session.refresh_token is None:
-                raise AccountError("Revoke this session from your account settings. The stored sign-in cannot renew.") from None
-            result = AccountAPI(session.server).request(
-                "POST", "/api/auth/device/session-status", {"refresh_token": session.refresh_token},
-            )
-            if result.get("status") not in ("revoked", "expired"):
-                raise AccountError("The server did not confirm session revocation.") from None
+        _revoke_session(session)
         account_credentials.clear()

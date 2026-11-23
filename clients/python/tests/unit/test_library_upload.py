@@ -125,8 +125,8 @@ class FakeLibrary:
                     session_id = library.binding["deviceSessionId"]
                     assert session_id not in library.sessions
                     session = library.sessions[session_id] = {
-                        "access_token": f"{TOKEN}-{len(library.sessions)}",
-                        "refresh_token": f"{REFRESH_TOKEN}-{len(library.sessions)}",
+                        "access_token": f"{TOKEN}-{session_id}",
+                        "refresh_token": f"{REFRESH_TOKEN}-{session_id}",
                         "expires": False, "revoked": False,
                     }
                     self.send_tokens("token", session_id, session)
@@ -518,7 +518,75 @@ def test_upload_does_not_take_over_unrelated_output(existing, library, monkeypat
         assert archive.read_bytes() == b"unrelated ZIP"
     else:
         assert not archive.exists()
+    assert not list((account_credentials.state_directory() / "uploads").glob("*.json"))
     assert library.events == []
+
+
+@pytest.mark.parametrize("point", ["before-journal", "after-journal", "during-copy"])
+def test_killed_save_can_retry(point, library, monkeypatch, tmp_path):
+    sign_in(monkeypatch, library)
+    library.events.clear()
+    directory = record(tmp_path)
+    archive = directory.with_suffix(".zip")
+    child = subprocess.run([sys.executable, "-c", """
+import os
+import sys
+from pathlib import Path
+
+source, point, home, directory, phone_url = sys.argv[1:]
+sys.path.insert(0, source)
+from agent_android import account_credentials, library_upload, recording
+
+Path.home = staticmethod(lambda: Path(home))
+
+def terminate(*args):
+    os._exit(23)
+
+if point == "before-journal":
+    account_credentials.write_private_json = terminate
+elif point == "after-journal":
+    library_upload._publish_application = terminate
+else:
+    publish_zip = library_upload._publish_zip
+
+    def terminate_during_publish(*args):
+        def terminate_during_copy(source, target):
+            target.write(source.read(16))
+            target.flush()
+            terminate()
+
+        library_upload.shutil.copyfileobj = terminate_during_copy
+        publish_zip(*args)
+
+    library_upload._publish_zip = terminate_during_publish
+
+with library_upload.pending_upload(recording.ActionSession(phone_url, "default"), Path(directory)):
+    raise AssertionError("Save reached the upload step")
+""", str(Path(recording.__file__).parents[1]), point, str(Path.home()), str(directory), PHONE_URL],
+        capture_output=True, text=True, timeout=30)
+    assert child.returncode == 23, child.stdout + child.stderr
+    assert directory.exists() == (point == "during-copy")
+    assert not archive.exists()
+    assert library.events == []
+    journals = list((account_credentials.state_directory() / "uploads").glob("*.json"))
+    if point == "before-journal":
+        assert journals == []
+    else:
+        journal, = journals
+        intent = json.loads(journal.read_text())
+        assert intent["targets"] == [os.path.normcase(path.resolve()) for path in (directory, archive)]
+        # The retry must use the saved or staged Application, even after the recording is cleared.
+        recording.ActionSession(PHONE_URL, "default").clear()
+    if point == "during-copy":
+        partial, = directory.parent.glob(".aivane-upload-*.tmp")
+        assert partial.stat().st_size == 16
+
+    assert save(monkeypatch, directory) == 0
+    entry, = library.requests.values()
+    assert entry["package"] == archive.read_bytes()
+    if journals:
+        assert entry["request"] == intent["request"]
+    assert not list(directory.parent.glob(".aivane-upload-*.tmp"))
 
 
 def test_interruption_after_local_save_resumes_original_zip(library, monkeypatch, tmp_path):
@@ -621,6 +689,28 @@ def test_signout_retries_after_lost_revocation_reply(library, monkeypatch):
     assert account_credentials.load() is None
 
 
+def test_25_explicit_sign_ins_keep_one_active_session(library, monkeypatch):
+    for _ in range(25):
+        session_id = library.binding["deviceSessionId"]
+        sign_in(monkeypatch, library)
+        assert [key for key, session in library.sessions.items() if not session["revoked"]] == [session_id]
+        assert account_credentials.load()["binding"]["deviceSessionId"] == session_id
+        library.binding["deviceSessionId"] = str(uuid4())
+
+    assert len(library.sessions) == len(library.authorizations) == 25
+    assert sum(path.endswith("/revoke") for _, path, _ in library.events) == 24
+
+
+def test_sign_in_replaces_a_session_that_is_already_gone(library, monkeypatch):
+    sign_in(monkeypatch, library)
+    previous_id = library.binding["deviceSessionId"]
+    library.sessions.pop(previous_id)
+    library.binding["deviceSessionId"] = str(uuid4())
+    sign_in(monkeypatch, library)
+    assert ("POST", f"/api/account/sessions/{previous_id}/revoke", {}) in library.events
+    assert account_credentials.load()["binding"] == library.binding
+
+
 def test_expired_legacy_credential_pins_owner_and_stays_offline(library, monkeypatch, tmp_path, capsys):
     sign_in(monkeypatch, library)
     session = account_credentials.load()
@@ -655,7 +745,8 @@ def test_retry_rejects_a_different_library_owner(field, library, monkeypatch, tm
     assert directory.with_suffix(".zip").is_file()
 
 
-def test_retry_rejects_changed_zip_and_recovers_when_restored(library, monkeypatch, tmp_path, capsys):
+@pytest.mark.parametrize("damage", ["missing", "partial", "changed"])
+def test_retry_rebuilds_zip_from_saved_application(damage, library, monkeypatch, tmp_path):
     sign_in(monkeypatch, library)
     directory = record(tmp_path)
     library.reject = ("package", 400, "LIBRARY_INVALID_UPLOAD")
@@ -663,17 +754,41 @@ def test_retry_rejects_changed_zip_and_recovers_when_restored(library, monkeypat
     library.events.clear()
     zip_path = directory.with_suffix(".zip")
     original = zip_path.read_bytes()
-    zip_path.write_bytes(original + b"changed")
-    assert save(monkeypatch, directory) == 1
-    assert "saved ZIP changed" in capsys.readouterr().err
-    assert library.events == []
-    assert zip_path.read_bytes() == original + b"changed"
+    if damage == "missing":
+        zip_path.unlink()
+    elif damage == "partial":
+        zip_path.write_bytes(original[:16])
+    else:
+        zip_path.write_bytes(original + b"changed")
+    for path in directory.iterdir():
+        os.utime(path, (946684800, 946684800))
 
-    zip_path.write_bytes(original)
     library.reject = None
     assert save(monkeypatch, directory) == 0
     entry, = library.requests.values()
-    assert entry["package"] == original and entry["receipt"]["changeSeq"] == 7
+    assert entry["package"] == original == zip_path.read_bytes()
+    assert entry["receipt"]["changeSeq"] == 7
+
+
+def test_retry_recovers_an_unbound_legacy_journal_with_a_partial_zip(library, monkeypatch, tmp_path):
+    directory = record(tmp_path)
+    assert save(monkeypatch, directory) == 1
+    journal, = (account_credentials.state_directory() / "uploads").glob("*.json")
+    intent = json.loads(journal.read_text())
+    for key in ("targets", "staging", "zipEntries"):
+        del intent[key]
+    account_credentials.write_private_json(journal, intent)
+    zip_path = directory.with_suffix(".zip")
+    zip_path.write_bytes(b"partial")
+    for path in directory.iterdir():
+        os.utime(path, (946684800, 946684800))
+
+    sign_in(monkeypatch, library)
+    assert save(monkeypatch, directory) == 0
+    entry, = library.requests.values()
+    assert entry["package"] == zip_path.read_bytes()
+    assert entry["request"]["clientRequestId"] == intent["request"]["clientRequestId"]
+    assert entry["request"]["digest"] == intent["request"]["digest"]
 
 
 @pytest.mark.parametrize("wrong_binding", [False, True])

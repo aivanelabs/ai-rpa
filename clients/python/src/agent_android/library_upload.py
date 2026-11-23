@@ -9,16 +9,18 @@ import shutil
 import struct
 import tempfile
 import zipfile
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
 from . import account_credentials
 from .account import AccountError, AccountSession, account_server, binding_from, valid_id
-from .recording import ActionSession, _lock_record
+from .recording import MAIN_TEMPLATE, ActionSession, _lock_record
 
 _ARCHIVE_LIMIT = 64 * 1024 * 1024
+_APPLICATION_FILES = ("app.json", f"{MAIN_TEMPLATE}.json")
+_STAGING_PREFIX = ".aivane-save-"
 _BAD_RECEIPT = "The library returned an unexpected upload receipt."
 _WRONG_BINDING = "This upload belongs to a different account server, account, tenant or workspace."
 
@@ -55,9 +57,8 @@ def _package_descriptor(data: bytes) -> dict:
     return {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
 
-def _read_package(path: Path) -> bytes:
-    with path.open("rb") as handle:
-        data = handle.read(_ARCHIVE_LIMIT + 1)
+def _read_package(handle) -> bytes:
+    data = handle.read(_ARCHIVE_LIMIT + 1)
     if len(data) > _ARCHIVE_LIMIT:
         raise AccountError("The saved ZIP exceeds the 64 MiB library upload limit.")
     return data
@@ -148,7 +149,7 @@ class PendingUpload:
         raise AccountError(_BAD_RECEIPT)
 
 
-def _load_entry(path: Path, source: list[str]) -> dict | None:
+def _load_entry(path: Path, source: list[str], targets: list[str]) -> dict | None:
     try:
         entry = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -158,6 +159,10 @@ def _load_entry(path: Path, source: list[str]) -> dict | None:
     try:
         if entry["source"] != source:
             raise AccountError("This output belongs to a different recording session.")
+        if "targets" in entry:
+            staging = entry["staging"]
+            if entry["targets"] != targets or not staging.startswith(_STAGING_PREFIX) or Path(staging).name != staging:
+                raise ValueError
         request = entry["request"]
         if not all(valid_id(value) for value in (entry["automationId"], request["clientRequestId"], request["revisionId"])):
             raise ValueError
@@ -166,30 +171,91 @@ def _load_entry(path: Path, source: list[str]) -> dict | None:
         if entry["binding"] is not None:
             binding_from(entry["binding"])
             account_server(entry["server"])
-    except (KeyError, TypeError, ValueError):
+    except (AttributeError, KeyError, TypeError, ValueError):
         raise AccountError("Could not read the upload journal.") from None
     return entry
 
 
-def _publish_saved(staged_zip: Path, directory: Path, zip_path: Path, journal: Path, entry: dict | None) -> None:
-    with ExitStack() as rollback:
-        # Claim both destinations exclusively before journaling any output.
-        directory.mkdir()
-        rollback.callback(directory.rmdir)
-        with zip_path.open("xb") as package:
-            rollback.callback(zip_path.unlink)
-            for source in staged_zip.with_suffix("").iterdir():
-                target = directory / source.name
-                with source.open("rb") as original, target.open("xb") as copy:
-                    rollback.callback(target.unlink)
-                    shutil.copyfileobj(original, copy)
-            if entry is not None:
-                # A complete uploadable ZIP always has a journal identifying its exact bytes.
-                account_credentials.write_private_json(journal, entry)
-                rollback.callback(journal.unlink)
-            with staged_zip.open("rb") as original:
-                shutil.copyfileobj(original, package)
-        rollback.pop_all()
+def _require_absent(directory: Path, zip_path: Path) -> None:
+    for path in (directory, zip_path):
+        if os.path.lexists(path):
+            raise FileExistsError(f"The save output already exists: {path}")
+
+
+def _publish_application(staging: Path, directory: Path, zip_path: Path) -> None:
+    staged_directory = staging / directory.name
+    if staged_directory.is_dir():
+        _require_absent(directory, zip_path)
+        staged_directory.rename(directory)
+    if staging.is_dir():
+        (staging / zip_path.name).unlink(missing_ok=True)
+        staging.rmdir()
+
+
+def _publish_zip(data: bytes, zip_path: Path, entry: dict) -> None:
+    # The journal owns this temporary path, even if a process died while copying to it.
+    temporary = zip_path.with_name(f".aivane-upload-{entry['automationId']}.tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        with temporary.open("xb") as package:
+            shutil.copyfileobj(io.BytesIO(data), package)
+        temporary.replace(zip_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _rebuild_package(directory: Path, entry: dict, journal: Path) -> bytes:
+    metadata = entry.get("zipEntries")
+    request = entry["request"]
+    with tempfile.TemporaryFile() as output:
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name in _APPLICATION_FILES:
+                path = directory / name
+                if metadata is None:
+                    archive.write(path, name)
+                    continue
+                # Keep the original ZIP header fields even if the file timestamps changed.
+                saved = metadata[name]
+                info = zipfile.ZipInfo(name, tuple(saved["dateTime"]))
+                info.create_system = saved["createSystem"]
+                info.external_attr = saved["externalAttr"]
+                info.compress_type = zipfile.ZIP_DEFLATED
+                with path.open("rb") as original:
+                    info.file_size = os.fstat(original.fileno()).st_size
+                    with archive.open(info, "w") as bundled:
+                        shutil.copyfileobj(original, bundled)
+        output.seek(0)
+        data = _read_package(output)
+        descriptor = _package_descriptor(data)
+        if descriptor == request["package"]:
+            return data
+        # Older journals did not preserve the ZIP headers. An unbound request has never
+        # been sent, so it can use rebuilt bytes if the Application contents still match.
+        if metadata is None and entry["binding"] is None:
+            with zipfile.ZipFile(output) as archive:
+                if tree_digest(archive) == request["digest"]:
+                    request["package"] = descriptor
+                    account_credentials.write_private_json(journal, entry)
+                    return data
+    raise AccountError("Could not recreate the original ZIP from the saved Application directory.")
+
+
+def _resume_saved(directory: Path, zip_path: Path, journal: Path, entry: dict) -> bytes:
+    if "staging" in entry:
+        _publish_application(directory.parent / entry["staging"], directory, zip_path)
+    if not directory.is_dir():
+        raise AccountError("The journaled Application directory is missing.")
+    try:
+        with zip_path.open("rb") as original:
+            data = _read_package(original)
+    except (FileNotFoundError, AccountError):
+        pass
+    else:
+        if _package_descriptor(data) == entry["request"]["package"]:
+            return data
+    data = _rebuild_package(directory, entry, journal)
+    _publish_zip(data, zip_path, entry)
+    return data
 
 
 def _new_entry(source: list[str], data: bytes) -> dict:
@@ -197,6 +263,10 @@ def _new_entry(source: list[str], data: bytes) -> dict:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             digest = tree_digest(archive)
             name = json.loads(archive.read("app.json"))["applicationName"]
+            metadata = {
+                info.filename: {"dateTime": info.date_time, "createSystem": info.create_system, "externalAttr": info.external_attr}
+                for info in archive.infolist()
+            }
     except (ValueError, KeyError, TypeError, zipfile.BadZipFile):
         raise AccountError("Could not read the saved Application ZIP.") from None
     return {
@@ -204,6 +274,7 @@ def _new_entry(source: list[str], data: bytes) -> dict:
         "server": None,
         "binding": None,
         "automationId": str(uuid4()),
+        "zipEntries": metadata,
         "request": {
             "clientRequestId": str(uuid4()),
             "revisionId": str(uuid4()),
@@ -221,30 +292,39 @@ def pending_upload(session: ActionSession, directory: Path):
     directory = directory.expanduser().resolve()
     zip_path = directory.with_name(directory.name + ".zip")
     source = [session.path.parent.name, session.name]
-    key = hashlib.sha256(os.fsencode(os.path.normcase(directory))).hexdigest()
+    targets = [os.path.normcase(path) for path in (directory, zip_path)]
+    key = hashlib.sha256(os.fsencode(targets[0])).hexdigest()
     journal = account_credentials.state_directory() / "uploads" / f"{key}.json"
     journal.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     # The permanent lock file serializes retries. The journal can be atomically replaced under it.
     with journal.with_suffix(".lock").open("a+b") as lock:
         _lock_record(lock)
-        entry = _load_entry(journal, source)
+        entry = _load_entry(journal, source, targets)
         if entry is not None:
-            if not directory.is_dir() or not zip_path.is_file():
-                raise AccountError("The journaled Application directory or ZIP is missing.")
-            data = _read_package(zip_path)
-            if _package_descriptor(data) != entry["request"].get("package"):
-                raise AccountError("The saved ZIP changed. Restore the original ZIP before retrying.")
+            data = _resume_saved(directory, zip_path, journal, entry)
             yield PendingUpload(journal, entry, data), None
             return
 
+        _require_absent(directory, zip_path)
         directory.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
-            staged_zip = session.save(Path(temporary) / directory.name)
+        staging = Path(tempfile.mkdtemp(prefix=_STAGING_PREFIX, dir=directory.parent))
+        try:
+            staged_zip = session.save(staging / directory.name)
             try:
-                data = _read_package(staged_zip)
+                with staged_zip.open("rb") as original:
+                    data = _read_package(original)
                 entry = _new_entry(source, data)
             except AccountError:
-                _publish_saved(staged_zip, directory, zip_path, journal, None)
+                _require_absent(directory, zip_path)
+                staged_zip.with_suffix("").rename(directory)
+                staged_zip.rename(zip_path)
                 raise
-            _publish_saved(staged_zip, directory, zip_path, journal, entry)
+            _require_absent(directory, zip_path)
+            entry.update(targets=targets, staging=staging.name)
+            account_credentials.write_private_json(journal, entry)
+            _publish_application(staging, directory, zip_path)
+        finally:
+            if not journal.exists():
+                shutil.rmtree(staging)
+        _publish_zip(data, zip_path, entry)
         yield PendingUpload(journal, entry, data), zip_path
