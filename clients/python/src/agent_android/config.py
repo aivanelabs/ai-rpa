@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlsplit
 
 CONFIG_FILE_PATH = Path(os.path.expanduser("~/.agent-android.json"))
 CONFIG_URL_KEY = "url"
@@ -64,6 +65,23 @@ def save_url_to_config(url: str) -> None:
 def save_token_to_config(token: Optional[str]) -> None:
     normalized = token.strip() if isinstance(token, str) and token.strip() else None
     _write_partial_config(CONFIG_TOKEN_KEY, normalized)
+
+
+def normalize_base_url(url: str) -> str:
+    url = url.strip()
+    if not url:
+        raise ValueError("Base URL is required")
+    if url.startswith("//"):
+        url = "http:" + url
+    elif "://" not in url:
+        url = "http://" + url
+    endpoint = urlsplit(url)
+    if endpoint.scheme not in ("http", "https") or not endpoint.hostname:
+        raise ValueError("Expected an HTTP or HTTPS URL with a hostname")
+    # Access the parsed port to reject invalid values before switching endpoints.
+    if endpoint.port == 0:
+        raise ValueError("Port must be greater than zero")
+    return url.rstrip("/")
 
 
 def resolve_base_url(cmdline_url: Optional[str]) -> Optional[str]:

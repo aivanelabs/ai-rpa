@@ -8,7 +8,7 @@ import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 from .client import AgentAndroidClient
-from .config import CONFIG_FILE_PATH, save_token_to_config, save_url_to_config
+from .config import CONFIG_FILE_PATH, normalize_base_url, save_token_to_config, save_url_to_config
 from .formatting import (
     _format_launcher_app,
     format_detail_card,
@@ -319,17 +319,15 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _readline(self) -> Optional[str]:
-        if _HAS_READLINE:
+        if not _HAS_READLINE:
             return input(self._prompt)
-        else:
-            return input(self._prompt)
-
-    def _add_history(self, line: str):
-        if _HAS_READLINE:
-            try:
-                readline.add_history(line)
-            except Exception:
-                pass
+        history_length = readline.get_current_history_length()
+        line = input(self._prompt)
+        words = line.split(maxsplit=2)
+        if words and (words[0] in ("i", "input", "ix", "inputx") or words[:2] == ["set", "token"]):
+            if readline.get_current_history_length() > history_length:
+                readline.remove_history_item(history_length)
+        return line
 
     def _save_history(self):
         if _HAS_READLINE and hasattr(self, '_history_file'):
@@ -1301,10 +1299,15 @@ class AriaReplSession:
             if not trimmed_value:
                 self._print_error("URL cannot be empty")
                 return False
-            self._replace_client(trimmed_value, self.client.token)
-            print(f"  URL set to: {trimmed_value}")
             try:
-                save_url_to_config(trimmed_value)
+                url = normalize_base_url(trimmed_value)
+                self._replace_client(url, self.client.token)
+            except ValueError as exc:
+                self._print_error(f"Invalid URL: {type(exc).__name__}: {exc}")
+                return False
+            print(f"  URL set to: {url}")
+            try:
+                save_url_to_config(url)
                 print(f"  Persisted to {CONFIG_FILE_PATH}")
             except OSError as exc:
                 print(f"  Warning: could not save URL to {CONFIG_FILE_PATH}: {exc}", file=sys.stderr)

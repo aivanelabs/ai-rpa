@@ -110,15 +110,17 @@ agent-android --repl --url http://<device-ip>:8080 --session demo
 agent-android save demo-app --url http://<device-ip>:8080 --session demo
 ```
 
-On the agent machine, successful launch, tap, text entry, swipe, and key actions append to `~/.aivane/agent-android/sessions/<device>/<session>.jsonl`. The device directory identifies the phone endpoint. Inspections, failed actions, and a launch waiting for chooser selection are omitted. Entered text becomes required Application inputs named `input_1`, `input_2`, and so on in entry order. The recorded text is omitted from the record and export. Explicit clears remain clear actions.
+On the agent machine, successful launch, tap, text entry, swipe, and key actions append to `~/.aivane/agent-android/sessions/<device>/<session>.jsonl`. The device directory is keyed by the phone endpoint URL. A changed address uses a separate recording, and a different phone at the same URL shares the existing one. Inspections, failed actions, and a launch waiting for chooser selection are omitted. Entered text becomes required Application inputs named `input_1`, `input_2`, and so on in entry order. Explicit clears remain clear actions. Tap locators can include the tapped element's visible text or accessibility description. That text is stored in the recording and export.
 
-For `save`, install the public linter and ensure `aivane-template-lint` is on `PATH`.
+Use `agent-android session clear --url http://<device-ip>:8080 --session demo` to discard the actions for that endpoint and session.
+
+For `save`, install the linter from the ai-rpa repository root and ensure `aivane-template-lint` is on `PATH`. PyPI release 0.1.1 is missing the schemas for `android.press.enter`, `android.touch.drag`, and `android.touch.longPress`.
 
 ```bash
-uv tool install aivane-template-linter
+python -m pip install -e clients/template-linter
 ```
 
-Save runs locally and works with the phone disconnected. It creates `app.json` and `__main__.json` in the target directory and packages both in the sibling ZIP. Use a fresh output path. Empty sessions and lint errors return a nonzero exit code.
+Save runs locally and works with the phone disconnected. It creates `app.json` and `__main__.json` in the target directory and packages both in the sibling ZIP. Use a fresh output path. Empty sessions and lint errors return a nonzero exit code. The exported template labels coordinate-only targets and unstable chooser index selections.
 
 Use an Android APK with the `/executeApplication` binding fix to replay. Supply replacement values through `--variables` and check the returned `success` field.
 

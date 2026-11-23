@@ -52,17 +52,21 @@ agent-android --health --url http://<device-ip>:8080
 
 ### 保存 Android Application
 
-单次命令、REPL 和 `save` 使用相同的手机 URL 和 `--session` 名称。省略 `--session` 时使用 `default`，换一个名称即可单独记录新流程。
+单次命令、REPL 和 `save` 使用相同的手机端点 URL 和 `--session` 名称。记录以端点 URL 标识设备。手机地址变更后会使用另一份记录，换成同一地址的另一部手机则会共用原记录。省略 `--session` 时使用 `default`，换一个名称即可单独记录新流程。
+
+从当前代码库安装校验工具，以使用其中的 `android.press.enter`、`android.touch.drag` 和 `android.touch.longPress` 操作定义。PyPI 的 0.1.1 版本缺少这些定义。请在当前 Python 环境中安装，并确保该环境的脚本目录在 `PATH` 中。
 
 ```bash
-uv tool install aivane-template-linter
+python -m pip install -e clients/template-linter
 agent-android --launch com.example.app --url http://<device-ip>:8080 --session demo
 agent-android --repl --url http://<device-ip>:8080 --session demo
 # In the REPL, use l to find a field, i <refId> <text> to type, and q to exit.
 agent-android save demo-app --url http://<device-ip>:8080 --session demo
 ```
 
-操控端只记录手机确认成功的交互操作，查看界面和失败的操作不会写入。`save` 运行本地校验，成功后保留 `demo-app/` 和 `demo-app.zip`。键入的文本会变成 `input_1` 等必填回放参数，记录和导出产物都不保存原文。记录和导出只需 CLI、手机 API 和本地校验工具，无需 AIVane 服务器、桌面应用或 Business 账号。
+操控端只记录手机确认成功的交互操作，查看界面和失败的操作不会写入。`save` 运行本地校验，成功后保留 `demo-app/` 和 `demo-app.zip`。键入的文本会变成 `input_1` 等必填回放参数。点击定位器可能包含元素的可见文本或无障碍描述，这些内容会写入记录和导出产物。记录和导出只需 CLI、手机 API 和本地校验工具，无需 AIVane 服务器、桌面应用或 Business 账号。
+
+如要清空指定端点和会话的动作记录，请运行 `agent-android session clear --url http://<device-ip>:8080 --session demo`。
 
 在包含 `/executeApplication` 执行绑定修复的 Android APK 上，可以传入新的参数值来回放 ZIP。
 

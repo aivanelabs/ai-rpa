@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +14,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .config import normalize_base_url
 from .recording import ActionSession
 from .snapshot import find_snapshot_element, load_snapshot, save_snapshot
 from .transport import _build_http_opener
@@ -21,10 +23,7 @@ class AgentAndroidClient:
     """Client for the AIVane Android REPL public API."""
 
     def __init__(self, base_url: str, token: Optional[str] = None):
-        trimmed = base_url.strip()
-        if not trimmed:
-            raise ValueError("Base URL is required")
-        self.base_url = trimmed.rstrip('/')
+        self.base_url = normalize_base_url(base_url)
         self.token = token.strip() if isinstance(token, str) and token.strip() else None
         self.action_session: Optional[ActionSession] = None
         self.execute_url = f"{self.base_url}/execute"
@@ -492,14 +491,21 @@ class AgentAndroidClient:
         self,
         snapshot_elem: Dict[str, Any],
         elements: List[Dict[str, Any]],
+        *,
+        snapshot_peers: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[Dict[str, Any]]:
         wanted = self._element_identity(snapshot_elem)
         if not any(part for part in wanted):
             return None
-        for elem in elements:
-            if self._element_identity(elem) == wanted:
-                return elem
-        return None
+        matches = [elem for elem in elements if self._element_identity(elem) == wanted]
+        snapshot_count = sum(
+            self._element_identity(peer) == wanted for peer in (snapshot_peers or []) if isinstance(peer, dict)
+        )
+        # A refresh may omit all but one of several identical rows.
+        if len(matches) > 1 or snapshot_count > 1:
+            bounds = snapshot_elem.get("bounds")
+            matches = [elem for elem in matches if bounds and elem.get("bounds") == bounds]
+        return matches[0] if len(matches) == 1 else None
 
     def _resolve_action_target(self, refId: int) -> Optional[Dict[str, Any]]:
         if self._local_tree:
@@ -530,9 +536,14 @@ class AgentAndroidClient:
 
                 current_tree = self.get_ui_elements(force_refresh=True)
                 if current_tree:
-                    matched = self._find_matching_snapshot_identity(snapshot_elem, current_tree)
+                    matched = self._find_matching_snapshot_identity(
+                        snapshot_elem, current_tree, snapshot_peers=snapshot["elements"]
+                    )
                     if matched is not None:
                         return matched
+                # A refresh may replace _snapshot even when the target still
+                # comes from the saved snapshot.
+                self._snapshot = snapshot
                 return snapshot_elem
 
         return self._find_element_by_refId(refId, force_refresh=True)
@@ -556,15 +567,29 @@ class AgentAndroidClient:
     def _record_action(self, result: Optional[Dict[str, Any]], operation_type: str,
                        parameters: Dict[str, Any]) -> None:
         if self.action_session is not None and result and result.get("success") is True:
-            self.action_session.append(operation_type, parameters)
+            try:
+                self.action_session.append(operation_type, parameters)
+            except Exception as exc:
+                print("Warning: phone action succeeded but could not be recorded locally.", file=sys.stderr)
+                traceback.print_exception(type(exc), exc, None, file=sys.stderr)
 
     def _target_locator(self, target: Dict[str, Any], *, use_text: bool = True) -> Dict[str, Any]:
-        peers = self._local_tree or [target]
-        resource_id = target.get("resourceId")
-        if resource_id and sum(node.get("resourceId") == resource_id for node in peers) <= 1:
-            return {"id": resource_id}
+        # Use the list that supplied this target, even if a refresh cached
+        # a different list while resolving the refId.
+        peers = self._local_tree or []
+        if not any(peer is target for peer in peers):
+            peers = (self._snapshot or {}).get("elements") or []
+            if not any(peer is target for peer in peers):
+                return {}
 
-        attributes = [("contentDesc", "content-desc")]
+        bounds = target.get("bounds")
+        if not self._parse_bounds_string(bounds or ""):
+            return {}
+        root = self._get_ui_tree_root(visible_only=False)
+        if root is None:
+            return {}
+
+        attributes = [("resourceId", "resource-id"), ("contentDesc", "content-desc")]
         if use_text and not target.get("editable") and target.get("simpleClassName") not in {
             "EditText", "AutoCompleteTextView", "TextInputEditText",
         }:
@@ -574,18 +599,22 @@ class AgentAndroidClient:
             if not value or ('"' in value and "'" in value) or "${" in value:
                 continue
             # XPath @text uses the description when the node has no text.
-            matches = sum((node.get(key) or node.get("contentDesc")) == value for node in peers)
-            if matches <= 1:
+            peer_matches = [
+                peer for peer in peers if isinstance(peer, dict)
+                and (peer.get(key) or (peer.get("contentDesc") if key == "text" else None)) == value
+            ]
+            matches = [
+                node for node in root.iter("node")
+                if (node.get(attribute) or (node.get("content-desc") if key == "text" else None)) == value
+            ]
+            if len(peer_matches) == len(matches) == 1 and matches[0].get("bounds") == bounds:
+                if key == "resourceId":
+                    return {"id": value}
                 return {"xpath": f"//*[@{attribute}={self._escape_xpath_value(value)}]"}
+            break
 
-        # The ARIA list omits some siblings and is visually sorted. Use the full
-        # hierarchy for XPath positions, without embedding a field's current value.
-        bounds = target.get("bounds")
-        if not bounds:
-            return {}
-        root = self._get_ui_tree_root(visible_only=False)
-        if root is None:
-            return {}
+        # The ARIA list omits some siblings and is visually sorted. Use XML
+        # positions without embedding a field's current value.
         node = self._find_matching_xml_node(target, root)
         if node is None or node.get("bounds") != bounds:
             return {}
@@ -1439,7 +1468,7 @@ class AgentAndroidClient:
         launched = details["status"] == "launched" and details.get("launched") is True
         if launched:
             replay_parameters = dict(parameters, selectionHandling="fail")
-            del replay_parameters["outputVariable"]
+            replay_parameters.pop("outputVariable", None)
             self._record_action(result, "android.app.launch", replay_parameters)
         if raw:
             print(json.dumps(details, ensure_ascii=False))
