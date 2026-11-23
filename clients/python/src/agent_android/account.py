@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from uuid import UUID
 
-from . import account_credentials
+from . import __version__, account_credentials
 from .config import normalize_base_url
 from .recording import _lock_record
 
@@ -30,11 +30,17 @@ BINDING_HEADERS = {
 }
 _SIGN_IN_AGAIN = "Account sign-in has expired or was rejected. Run `agent-android sign-in` again."
 _INVALID_RESPONSE = "The account server returned an unexpected response."
+_NATIVE_TOKEN_PATH = "/api/auth/native/token"
 _REFRESH_PATH = "/api/auth/device/refresh"
+_DESKTOP_HEADERS = {
+    "X-AIVane-Desktop-Channel": "direct",
+    "X-AIVane-Desktop-Version": __version__,
+}
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _BROWSER_TIMEOUT = 300
 _JSON_LIMIT = 1024 * 1024
 _SERVER_ERRORS = {
+    "INVALID_DESKTOP_CHANNEL": "The account server rejected the desktop channel (INVALID_DESKTOP_CHANNEL).",
     "SYNC_BINDING_CHANGED": "The account, tenant, workspace or session binding changed.",
     "SYNC_CONFLICT": "The library head changed (SYNC_CONFLICT).",
     "SYNC_HEAD_CHANGED": "The library head changed (SYNC_HEAD_CHANGED).",
@@ -115,6 +121,11 @@ class AccountAPI:
 
     def request(self, method: str, path: str, body: dict | bytes | None = None, *, sha256: str | None = None) -> dict:
         headers = dict(self.headers)
+        if (
+            path.startswith("/api/auth/device/") or path == _NATIVE_TOKEN_PATH
+            or (path.startswith("/api/account/sessions/") and path.endswith("/revoke"))
+        ):
+            headers.update(_DESKTOP_HEADERS)
         if isinstance(body, dict):
             body = json.dumps(body).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -326,7 +337,7 @@ def sign_in(url: str | None) -> None:
     except OSError:
         raise AccountError("Could not start the loopback listener for browser sign-in.") from None
     start = time.time()
-    result = AccountAPI(server).request("POST", "/api/auth/native/token", {
+    result = AccountAPI(server).request("POST", _NATIVE_TOKEN_PATH, {
         "grant_type": "authorization_code", "code": code, "code_verifier": verifier, "redirect_uri": redirect,
     })
     session = _session_from_grant(server, result, start)

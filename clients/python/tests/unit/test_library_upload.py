@@ -20,7 +20,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from agent_android import account, account_credentials, cli, library_upload, recording
+from agent_android import __version__, account, account_credentials, cli, library_upload, recording
 from agent_android.library_upload import tree_digest
 
 PHONE_URL = "http://127.0.0.1:1"
@@ -91,6 +91,10 @@ class FakeLibrary:
                     "code": code, "message": f"Server diagnostics containing {TOKEN} and {AUTHORIZATION_CODE}",
                 }})
 
+            def assert_desktop_headers(self):
+                assert self.headers.get("X-AIVane-Desktop-Channel") == "direct"
+                assert self.headers.get("X-AIVane-Desktop-Version") == __version__
+
             def handle_route(self):
                 target = urlsplit(self.path)
                 data = self.rfile.read(int(self.headers.get("Content-Length", 0)))
@@ -111,6 +115,7 @@ class FakeLibrary:
                     self.end_headers()
                     return
                 if target.path == "/api/auth/native/token":
+                    self.assert_desktop_headers()
                     fields = library.authorizations[-1]
                     assert set(body) == {"grant_type", "code", "code_verifier", "redirect_uri"}
                     assert body["grant_type"] == "authorization_code"
@@ -133,8 +138,11 @@ class FakeLibrary:
                     return
 
                 if target.path in ("/api/auth/device/refresh", "/api/auth/device/session-status"):
+                    self.assert_desktop_headers()
                     assert self.command == "POST" and set(body) == {"refresh_token"}
                     assert "Authorization" not in self.headers
+                    if self.reject(target.path.rsplit("/", 1)[-1]):
+                        return
                     session_id, session = next(
                         ((key, value) for key, value in library.sessions.items()
                          if value["refresh_token"] == body["refresh_token"]), (None, None),
@@ -164,6 +172,7 @@ class FakeLibrary:
                     return
                 assert "Cookie" not in self.headers and "Origin" not in self.headers
                 if target.path == f"/api/account/sessions/{session_id}/revoke":
+                    self.assert_desktop_headers()
                     assert self.command == "POST" and body == {}
                     assert all(header not in self.headers for header in SYNC_HEADERS.values())
                     session["revoked"] = True
@@ -686,7 +695,27 @@ def test_signout_retries_after_lost_revocation_reply(library, monkeypatch):
     assert account_credentials.load() is not None
     assert library.sessions[BINDING["deviceSessionId"]]["revoked"]
     assert run_cli(monkeypatch, "sign-out") == 0
+    assert library.events[-1][1] == "/api/auth/device/session-status"
     assert account_credentials.load() is None
+
+
+@pytest.mark.parametrize("stage", ["refresh", "session-status"])
+def test_signout_reports_invalid_desktop_channel(stage, library, monkeypatch, capsys):
+    sign_in(monkeypatch, library)
+    saved = account_credentials.load()
+    if stage == "refresh":
+        saved["expires_at"] = 0
+        account_credentials.save(saved)
+    else:
+        library.sessions[BINDING["deviceSessionId"]]["revoked"] = True
+
+    library.reject = (stage, 400, "INVALID_DESKTOP_CHANNEL")
+    assert run_cli(monkeypatch, "sign-out") == 1
+    assert library.events[-1][1] == f"/api/auth/device/{stage}"
+    assert account_credentials.load() == saved
+    assert capsys.readouterr().err.strip() == (
+        "The account server rejected the desktop channel (INVALID_DESKTOP_CHANNEL)."
+    )
 
 
 def test_25_explicit_sign_ins_keep_one_active_session(library, monkeypatch):
