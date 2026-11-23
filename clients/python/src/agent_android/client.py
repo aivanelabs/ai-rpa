@@ -558,6 +558,51 @@ class AgentAndroidClient:
         if self.action_session is not None and result and result.get("success") is True:
             self.action_session.append(operation_type, parameters)
 
+    def _target_locator(self, target: Dict[str, Any], *, use_text: bool = True) -> Dict[str, Any]:
+        peers = self._local_tree or [target]
+        resource_id = target.get("resourceId")
+        if resource_id and sum(node.get("resourceId") == resource_id for node in peers) <= 1:
+            return {"id": resource_id}
+
+        attributes = [("contentDesc", "content-desc")]
+        if use_text and not target.get("editable") and target.get("simpleClassName") not in {
+            "EditText", "AutoCompleteTextView", "TextInputEditText",
+        }:
+            attributes.append(("text", "text"))
+        for key, attribute in attributes:
+            value = target.get(key)
+            if not value or ('"' in value and "'" in value) or "${" in value:
+                continue
+            # XPath @text uses the description when the node has no text.
+            matches = sum((node.get(key) or node.get("contentDesc")) == value for node in peers)
+            if matches <= 1:
+                return {"xpath": f"//*[@{attribute}={self._escape_xpath_value(value)}]"}
+
+        # The ARIA list omits some siblings and is visually sorted. Use the full
+        # hierarchy for XPath positions, without embedding a field's current value.
+        bounds = target.get("bounds")
+        if not bounds:
+            return {}
+        root = self._get_ui_tree_root(visible_only=False)
+        if root is None:
+            return {}
+        node = self._find_matching_xml_node(target, root)
+        if node is None or node.get("bounds") != bounds:
+            return {}
+
+        parents = self._build_xml_parent_map(root)
+        segments = []
+        while node is not None and node.tag == "node":
+            parent = parents[id(node)]
+            cls = self._xml_short_class(node)
+            if not cls:
+                return {}
+            siblings = list(parent) if parent is not None else [node]
+            same_class = [sibling for sibling in siblings if self._xml_short_class(sibling) == cls]
+            segments.append(f"{cls}[{same_class.index(node) + 1}]")
+            node = parent
+        return {"xpath": "/hierarchy/" + "/".join(reversed(segments))}
+
     def _get_coordinates(self, elem: Dict[str, Any], label: str
                          ) -> Optional[Tuple[Any, Any]]:
         """Retrieve tap coordinates, failing if none are provided."""
@@ -949,16 +994,23 @@ class AgentAndroidClient:
         if not target:
             return False
 
-        coords = self._get_coordinates(target, f"Element refId={refId}")
-        if not coords:
-            return False
-        x, y = coords
+        locator = self._target_locator(target)
+        if locator:
+            parameters = {"mode": "locator", **locator}
+            message = f"Tapped refId={refId}"
+        else:
+            coords = self._get_coordinates(target, f"Element refId={refId}")
+            if not coords:
+                return False
+            x, y = coords
+            parameters = {"mode": "coordinate", "x": x, "y": y}
+            message = f"Tapped refId={refId} at ({x}, {y})"
 
         return self._run_single_operation(
             template_id=f"tap-refId-{refId}",
             operation_type="android.touch.tap",
-            parameters={"mode": "coordinate", "x": x, "y": y},
-            success_message=f"Tapped refId={refId} at ({x}, {y})",
+            parameters=parameters,
+            success_message=message,
             failure_prefix="Tap failed"
         )
 
@@ -979,20 +1031,22 @@ class AgentAndroidClient:
             )
             return False
 
-        coords = self._get_coordinates(target, f"Element refId={refId}")
-        if not coords:
+        locator = self._target_locator(target, use_text=False)
+        if not locator:
+            print(
+                f"Input failed: no locator for refId={refId}. Refresh the UI tree or use an explicit XPath.",
+                file=sys.stderr,
+            )
             return False
-        x, y = coords
 
         action = "Clearing" if clearFirst and text == "" else "Inputting"
-        print(f"{action} text for refId={refId} at ({x}, {y})")
+        print(f"{action} text for refId={refId}")
 
         return self._run_single_operation(
             template_id=f"input-refId-{refId}",
             operation_type="android.element.input",
             parameters={
-                "x": x,
-                "y": y,
+                **locator,
                 "value": text,
                 "clearFirst": clearFirst
             },

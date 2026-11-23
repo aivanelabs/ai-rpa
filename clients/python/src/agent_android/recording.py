@@ -81,10 +81,16 @@ class ActionSession:
 
         inputs = []
         for action in actions:
+            parameters = action["parameters"]
+            if (
+                parameters.get("mode") == "coordinate"
+                or action["operationType"] == "android.element.input" and "x" in parameters and "y" in parameters
+            ):
+                action["description"] = "Coordinate-only target. Replay depends on the screen layout."
             if action.pop("textInput", False):
                 name = f"input_{len(inputs) + 1}"
                 inputs.append({"name": name, "type": "STRING", "direction": "INPUT", "required": True})
-                action["parameters"]["value"] = "${" + name + "}"
+                parameters["value"] = "${" + name + "}"
 
         documents = {
             "app.json": {
