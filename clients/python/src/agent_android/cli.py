@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import __version__
+from .account import AccountError, sign_in, sign_out
 from .client import AgentAndroidClient
 from .config import TOKEN_ENV_VAR, require_base_url, resolve_api_token
 from .formatting import print_tree
+from .library_upload import pending_upload
 from .recording import DEFAULT_SESSION, ActionSession
 from .repl import AriaReplSession
 
@@ -35,6 +37,9 @@ One-off examples:
     agent-android --tap 7 --url http://<device-ip>:8080
     agent-android --input 7 "hello world" --url http://<device-ip>:8080
     agent-android save <dir> --url http://<device-ip>:8080 --session default
+    agent-android sign-in --url https://account.example.com
+    agent-android save <dir> --upload --url http://<device-ip>:8080 --session default
+    agent-android sign-out
     agent-android session clear --url http://<device-ip>:8080 --session default
     agent-android --template template.json --url http://<device-ip>:8080
     agent-android --template template.json --async --url http://<device-ip>:8080
@@ -455,17 +460,46 @@ def _handle_tree_queries(
             print_tree(results, args.filter, client.get_current_package_name())
 
 
+def _run_account_command(command: str, argv: List[str]) -> int:
+    parser = argparse.ArgumentParser(prog=f"agent-android {command}")
+    if command == "sign-in":
+        parser.add_argument("--url", "-u", metavar="ACCOUNT_SERVER", help="Account server origin")
+    args = parser.parse_args(argv)
+    try:
+        if command == "sign-in":
+            sign_in(args.url)
+            print("Signed in to the account library.")
+        else:
+            sign_out()
+            print("Signed out of the account library.")
+    except AccountError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print(f"Account {command} cancelled.", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _print_saved_application(zip_path: Path) -> None:
+    print(f"Saved Application directory {zip_path.with_suffix('')} and ZIP {zip_path}")
+
+
 def _run_local_command(command: str, argv: List[str]) -> int:
     description = {
-        "save": "Save and lint an Android Application locally.",
+        "save": "Save and lint an Android Application, with optional account library upload.",
         "session": "Manage the local Android action session.",
     }
     parser = argparse.ArgumentParser(prog=f"agent-android {command}", description=description[command])
+    url_options = ("--url", "-u")
     if command == "save":
         parser.add_argument("directory", type=Path, metavar="DIR")
+        parser.add_argument("--upload", action="store_true", help="Upload the saved ZIP to the account library")
+        # Preserve the --url abbreviation that existed before --upload was added.
+        url_options += ("--u",)
     else:
         parser.add_argument("action", choices=["clear"], help="Clear the recorded actions in this session")
-    parser.add_argument("--url", "-u", help="Phone URL used during recording (defaults to saved URL)")
+    parser.add_argument(*url_options, help="Phone URL used during recording (defaults to saved URL)")
     parser.add_argument("--session", default=DEFAULT_SESSION, help="Local action session name (default: default)")
     parser.add_argument("--token", help=argparse.SUPPRESS)  # Local commands do not contact the phone.
     args = parser.parse_args(argv)
@@ -475,19 +509,29 @@ def _run_local_command(command: str, argv: List[str]) -> int:
             session.clear()
             print(f"Cleared action session {session.name!r}")
             return 0
+        if args.upload:
+            with pending_upload(session, args.directory) as (pending, zip_path):
+                if zip_path is not None:
+                    _print_saved_application(zip_path)
+                receipt = pending.upload()
+            sequence = f" (change sequence {receipt.change_seq})" if receipt.change_seq is not None else ""
+            print(f"Library automation {receipt.automation_id}, revision {receipt.revision_id}{sequence}")
+            return 0
         zip_path = session.save(args.directory)
+    except AccountError as exc:
+        print(f"Upload failed. {exc}", file=sys.stderr)
+        return 1
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         label = "Save" if command == "save" else "Session clear"
         print(f"{label} failed:", file=sys.stderr)
         traceback.print_exception(type(exc), exc, None, file=sys.stderr)
         return 1
-    print(f"Saved Application directory {zip_path.with_suffix('')} and ZIP {zip_path}")
+    _print_saved_application(zip_path)
     return 0
 
 
-def _local_command_index(argv: List[str]) -> int:
-    # Skip only leading connection options and their values. A value of "save"
-    # or "session" must not select a command.
+def _command_index(argv: List[str]) -> int:
+    # Skip leading connection options and their values before looking for a command.
     index = 0
     while index < len(argv):
         option = argv[index]
@@ -502,9 +546,13 @@ def _local_command_index(argv: List[str]) -> int:
 
 def main() -> int:
     argv = sys.argv[1:]
-    index = _local_command_index(argv)
-    if index < len(argv) and argv[index] in ("save", "session"):
-        return _run_local_command(argv[index], argv[:index] + argv[index + 1:])
+    index = _command_index(argv)
+    if index < len(argv):
+        command, options = argv[index], argv[:index] + argv[index + 1:]
+        if command in ("sign-in", "sign-out"):
+            return _run_account_command(command, options)
+        if command in ("save", "session"):
+            return _run_local_command(command, options)
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.match_index is not None and not args.validate_xpath:

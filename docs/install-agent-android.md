@@ -86,6 +86,23 @@ Then reopen the terminal and retry.
 
 This smoke ensures the base APIs and CLI actions function before automating larger flows.
 
+### Optional account library upload
+
+Install the template linter from the repository root and keep its command on your `PATH`.
+
+```bash
+python -m pip install -e clients/template-linter
+```
+
+Sign in with your account server's HTTPS origin, approve access in the system browser, and save to a fresh directory.
+
+```bash
+agent-android sign-in --url https://account.example.com
+agent-android save demo-app --upload --url http://<device-ip>:8080 --session demo
+```
+
+Use the phone URL and session from your recording on `save`. The upload prints a library automation ID and revision ID. Keep the directory and ZIP if the upload fails, and repeat the same command to resume. The CLI refreshes expired access tokens automatically. Sign in again to the same account if the session can no longer be refreshed. Run `agent-android sign-out` to revoke the current device session and clear its stored credentials.
+
 ## 5. Wrap the flow in a skill
 
 This repository ships public skill references under [`skills/`](../skills/), especially [`skills/agent-android/SKILL.md`](../skills/agent-android/SKILL.md).

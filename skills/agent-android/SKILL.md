@@ -128,6 +128,17 @@ Use an Android APK with the `/executeApplication` binding fix to replay. Supply 
 agent-android --application-bundle demo-app.zip --url http://<device-ip>:8080 --variables '{"input_1":"new text"}'
 ```
 
+### Upload a saved Application to the account library
+
+When the user asks to upload, have them sign in through the system browser. Use their account server's HTTPS origin for `sign-in` and the recording's phone URL and session for `save`.
+
+```bash
+agent-android sign-in --url https://account.example.com
+agent-android save demo-app --upload --url http://<device-ip>:8080 --session demo
+```
+
+Report the library automation ID and revision ID printed after upload. If the upload fails, keep the local directory and ZIP and retry with the same arguments and ZIP bytes. The CLI refreshes expired access tokens automatically. If the session can no longer be refreshed, the user can run `agent-android sign-in` again with the same account and workspace. Use `agent-android sign-out` to revoke the current device session and clear its stored credentials.
+
 ## REPL Command Reference
 
 Use the REPL for exploratory tasks and smoke runs. Short aliases and long names both work.
