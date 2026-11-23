@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .recording import ActionSession
 from .snapshot import find_snapshot_element, load_snapshot, save_snapshot
 from .transport import _build_http_opener
 
@@ -25,6 +26,7 @@ class AgentAndroidClient:
             raise ValueError("Base URL is required")
         self.base_url = trimmed.rstrip('/')
         self.token = token.strip() if isinstance(token, str) and token.strip() else None
+        self.action_session: Optional[ActionSession] = None
         self.execute_url = f"{self.base_url}/execute"
         self.execute_application_url = f"{self.base_url}/executeApplication"
         self._opener = _build_http_opener(self.base_url)
@@ -127,7 +129,7 @@ class AgentAndroidClient:
                 "errorMessage": self._describe_transport_error(e),
             }
             result = self._decode_json_response_body(e.read(), error_fallback)
-            result.setdefault("success", False)
+            result["success"] = False
             result.setdefault("status", e.code)
             return result
         except urllib.error.URLError as e:
@@ -542,13 +544,19 @@ class AgentAndroidClient:
         """Execute an operation and print a consistent success/failure message."""
         result = self._execute_single_operation(template_id, operation_type, parameters)
         if result and result.get('success'):
-            print(success_message)
             self._invalidate_ui_state_cache()
+            self._record_action(result, operation_type, parameters or {})
+            print(success_message)
             return True
 
         msg = result.get('errorMessage', 'Unknown error') if result else 'no response'
         print(f"{failure_prefix}: {msg}")
         return False
+
+    def _record_action(self, result: Optional[Dict[str, Any]], operation_type: str,
+                       parameters: Dict[str, Any]) -> None:
+        if self.action_session is not None and result and result.get("success") is True:
+            self.action_session.append(operation_type, parameters)
 
     def _get_coordinates(self, elem: Dict[str, Any], label: str
                          ) -> Optional[Tuple[Any, Any]]:
@@ -971,14 +979,13 @@ class AgentAndroidClient:
             )
             return False
 
-        elem_desc = target.get('text') or target.get('contentDesc') or f"refId={refId}"
         coords = self._get_coordinates(target, f"Element refId={refId}")
         if not coords:
             return False
         x, y = coords
 
         action = "Clearing" if clearFirst and text == "" else "Inputting"
-        print(f"{action} '{text}' to '{elem_desc}' (refId={refId}) at ({x}, {y})")
+        print(f"{action} text for refId={refId} at ({x}, {y})")
 
         return self._run_single_operation(
             template_id=f"input-refId-{refId}",
@@ -992,7 +999,7 @@ class AgentAndroidClient:
             success_message=(
                 f"SUCCESS: Cleared element refId={refId}"
                 if clearFirst and text == ""
-                else f"SUCCESS: Input '{text}' to element refId={refId}"
+                else f"SUCCESS: Input text to element refId={refId}"
             ),
             failure_prefix="FAILED"
         )
@@ -1286,8 +1293,9 @@ class AgentAndroidClient:
 
         result = self._api_call(template)
         if result and result.get('success'):
-            print(f"Pressed: {key}")
             self._invalidate_ui_state_cache()
+            self._record_action(result, op_type, {})
+            print(f"Pressed: {key}")
             return True
 
         msg = result.get('errorMessage', 'Unknown') if result else 'no response'
@@ -1374,19 +1382,25 @@ class AgentAndroidClient:
             }
         self.last_launch_result = details
         self._invalidate_ui_state_cache()
+        launched = details["status"] == "launched" and details.get("launched") is True
+        if launched:
+            replay_parameters = dict(parameters, selectionHandling="fail")
+            del replay_parameters["outputVariable"]
+            self._record_action(result, "android.app.launch", replay_parameters)
         if raw:
             print(json.dumps(details, ensure_ascii=False))
-        elif details["status"] == "launched" and details.get("launched") is True:
+        elif launched:
             print(f"Launched: {package}")
         elif details["status"] == "selection_required":
             print(f"selection_required: {details.get('message', 'Choose an app instance.')}")
             for choice in details.get("choices", []):
                 print(f"  [{choice['index']}] {choice.get('label', '')}")
-            print(f"Continue: agent-android --url {self.base_url} --launch {package} --launch-choice N")
+            session_flag = f" --session {self.action_session.name}" if self.action_session else ""
+            print(f"Continue: agent-android --url {self.base_url}{session_flag} --launch {package} --launch-choice N")
             print("Indices refer to the current visible chooser; they do not identify original/clone accounts.")
         else:
             print(f"Launch failed: {details.get('message', 'Unknown error')}")
-        return details.get("status") == "launched" and details.get("launched") is True
+        return launched
 
     def press_back(self) -> bool:
         return self._run_single_operation(
@@ -2832,7 +2846,7 @@ class AgentAndroidClient:
             success_message=(
                 f"Cleared XPath [{xpath}]"
                 if text == ""
-                else f"Input '{text}' to XPath [{xpath}]"
+                else f"Input text to XPath [{xpath}]"
             ),
             failure_prefix="FAILED"
         )

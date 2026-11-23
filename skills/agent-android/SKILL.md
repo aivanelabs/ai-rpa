@@ -100,6 +100,32 @@ Waiting and output:
 - `agent-android --task-logs TASK_ID --url http://<device-ip>:8080`
 - `agent-android --stop-task TASK_ID --url http://<device-ip>:8080`
 
+## Record and save an Application
+
+When the user wants to reuse a workflow, choose a fresh `--session` name and pass it with the same phone URL to every one-off command and REPL invocation. Use lowercase letters, digits, hyphens or underscores, starting with a letter or digit. The default session is `default`.
+
+```bash
+agent-android --launch com.example.app --url http://<device-ip>:8080 --session demo
+agent-android --repl --url http://<device-ip>:8080 --session demo
+agent-android save demo-app --url http://<device-ip>:8080 --session demo
+```
+
+On the agent machine, successful launch, tap, text entry, swipe, and key actions append to `~/.aivane/agent-android/sessions/<device>/<session>.jsonl`. The device directory identifies the phone endpoint. Inspections, failed actions, and a launch waiting for chooser selection are omitted. Entered text becomes required Application inputs named `input_1`, `input_2`, and so on in entry order. The recorded text is omitted from the record and export. Explicit clears remain clear actions.
+
+For `save`, install the public linter and ensure `aivane-template-lint` is on `PATH`.
+
+```bash
+uv tool install aivane-template-linter
+```
+
+Save runs locally and works with the phone disconnected. It creates `app.json` and `__main__.json` in the target directory and packages both in the sibling ZIP. Use a fresh output path. Empty sessions and lint errors return a nonzero exit code.
+
+Use an Android APK with the `/executeApplication` binding fix to replay. Supply replacement values through `--variables` and check the returned `success` field.
+
+```bash
+agent-android --application-bundle demo-app.zip --url http://<device-ip>:8080 --variables '{"input_1":"new text"}'
+```
+
 ## REPL Command Reference
 
 Use the REPL for exploratory tasks and smoke runs. Short aliases and long names both work.

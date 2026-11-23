@@ -50,6 +50,26 @@ agent-android --health --url http://<device-ip>:8080
 
 包含演示视频、快速上手、REPL 命令、模板上传和校验的完整指南：[docs/android/README_CN.md](docs/android/README_CN.md)。
 
+### 保存 Android Application
+
+单次命令、REPL 和 `save` 使用相同的手机 URL 和 `--session` 名称。省略 `--session` 时使用 `default`，换一个名称即可单独记录新流程。
+
+```bash
+uv tool install aivane-template-linter
+agent-android --launch com.example.app --url http://<device-ip>:8080 --session demo
+agent-android --repl --url http://<device-ip>:8080 --session demo
+# In the REPL, use l to find a field, i <refId> <text> to type, and q to exit.
+agent-android save demo-app --url http://<device-ip>:8080 --session demo
+```
+
+操控端只记录手机确认成功的交互操作，查看界面和失败的操作不会写入。`save` 运行本地校验，成功后保留 `demo-app/` 和 `demo-app.zip`。键入的文本会变成 `input_1` 等必填回放参数，记录和导出产物都不保存原文。记录和导出只需 CLI、手机 API 和本地校验工具，无需 AIVane 服务器、桌面应用或 Business 账号。
+
+在包含 `/executeApplication` 执行绑定修复的 Android APK 上，可以传入新的参数值来回放 ZIP。
+
+```bash
+agent-android --application-bundle demo-app.zip --url http://<device-ip>:8080 --variables '{"input_1":"new text"}'
+```
+
 ## 仓库结构
 
 | 路径 | 内容 |
@@ -63,6 +83,13 @@ agent-android --health --url http://<device-ip>:8080
 | `aivane.apk` | Android REPL beta 的 APK 构建（正式版本见 [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)） |
 
 ## 贡献、安全、许可证
+
+在已激活的 Python 3.11+ 虚拟环境中，从仓库根目录运行两套 Python 单元测试。
+
+```bash
+python -m pip install pytest -e clients/python -e clients/template-linter
+pytest -m "not device"
+```
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)

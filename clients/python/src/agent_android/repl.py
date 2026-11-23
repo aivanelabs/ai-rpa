@@ -16,6 +16,7 @@ from .formatting import (
     format_status,
     print_tree,
 )
+from .recording import ActionSession
 
 try:
     import readline
@@ -1270,6 +1271,9 @@ class AriaReplSession:
         """vars - show session variables."""
         print("  Session:")
         print(f"    URL:      {self.client.base_url}")
+        recording = getattr(self.client, "action_session", None)
+        if recording is not None:
+            print(f"    Record:   {recording.name}")
         print(f"    Token:    {'SET' if self.client.token else 'NOT SET'}")
         print(f"    Timeout:  {self._timeout}s")
         print(f"    RawJSON:  {'ON' if self._raw_output else 'OFF'}")
@@ -1277,6 +1281,14 @@ class AriaReplSession:
         if self._tree:
             print(f"    Elements: {len(self._tree)}")
         return True
+
+    def _replace_client(self, url: str, token: Optional[str]) -> None:
+        client = AgentAndroidClient(url, token=token)
+        recording = getattr(self.client, "action_session", None)
+        if recording is not None:
+            client.action_session = ActionSession(url, recording.name)
+        self.client = client
+        self._invalidate_tree()
 
     def _cmd_set(self, args: List[str]) -> bool:
         """set <url|token|timeout> <value> - set a session variable."""
@@ -1289,7 +1301,7 @@ class AriaReplSession:
             if not trimmed_value:
                 self._print_error("URL cannot be empty")
                 return False
-            self.client = AgentAndroidClient(trimmed_value, token=self.client.token)
+            self._replace_client(trimmed_value, self.client.token)
             print(f"  URL set to: {trimmed_value}")
             try:
                 save_url_to_config(trimmed_value)
@@ -1300,7 +1312,7 @@ class AriaReplSession:
             decoded = self._decode_input_payload(value.strip())
             normalized = decoded.strip()
             token = normalized or None
-            self.client = AgentAndroidClient(self.client.base_url, token=token)
+            self._replace_client(self.client.base_url, token)
             if token:
                 print("  Token set for protected API access")
             else:

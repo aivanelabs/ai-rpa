@@ -50,6 +50,26 @@ agent-android --health --url http://<device-ip>:8080
 
 Full guide with demos, quickstart, REPL commands, template upload and validation: [docs/android/README.md](docs/android/README.md).
 
+### Save an Android Application
+
+Use the same phone URL and `--session` name for one-off commands, the REPL, and `save`. Omit `--session` to use `default`. Choose a new name to start a separate recording.
+
+```bash
+uv tool install aivane-template-linter
+agent-android --launch com.example.app --url http://<device-ip>:8080 --session demo
+agent-android --repl --url http://<device-ip>:8080 --session demo
+# In the REPL, use l to find a field, i <refId> <text> to type, and q to exit.
+agent-android save demo-app --url http://<device-ip>:8080 --session demo
+```
+
+Successful interactive UI actions are recorded on the controlling machine. Inspections and failed actions are omitted. `save` runs the local linter and writes `demo-app/` and `demo-app.zip` after a successful export. Entered text becomes required replay inputs such as `input_1` without storing the original text in either file set. Recording and export require only the CLI, phone API, and local linter. No AIVane server, desktop app, or Business account is required.
+
+On an Android APK with the `/executeApplication` binding fix, replay the ZIP with replacement input values:
+
+```bash
+agent-android --application-bundle demo-app.zip --url http://<device-ip>:8080 --variables '{"input_1":"new text"}'
+```
+
 ## Repository layout
 
 | Path | Contents |
@@ -63,6 +83,13 @@ Full guide with demos, quickstart, REPL commands, template upload and validation
 | `aivane.apk` | Android REPL beta APK build (releases are on [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)) |
 
 ## Contributing, security, license
+
+Run both Python unit suites from the repository root in an active Python 3.11+ virtual environment.
+
+```bash
+python -m pip install pytest -e clients/python -e clients/template-linter
+pytest -m "not device"
+```
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)
