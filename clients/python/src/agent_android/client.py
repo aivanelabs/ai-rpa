@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +14,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .config import normalize_base_url
+from .recording import ActionSession
 from .snapshot import find_snapshot_element, load_snapshot, save_snapshot
 from .transport import _build_http_opener
 
@@ -20,11 +23,9 @@ class AgentAndroidClient:
     """Client for the AIVane Android REPL public API."""
 
     def __init__(self, base_url: str, token: Optional[str] = None):
-        trimmed = base_url.strip()
-        if not trimmed:
-            raise ValueError("Base URL is required")
-        self.base_url = trimmed.rstrip('/')
+        self.base_url = normalize_base_url(base_url)
         self.token = token.strip() if isinstance(token, str) and token.strip() else None
+        self.action_session: Optional[ActionSession] = None
         self.execute_url = f"{self.base_url}/execute"
         self.execute_application_url = f"{self.base_url}/executeApplication"
         self._opener = _build_http_opener(self.base_url)
@@ -127,7 +128,7 @@ class AgentAndroidClient:
                 "errorMessage": self._describe_transport_error(e),
             }
             result = self._decode_json_response_body(e.read(), error_fallback)
-            result.setdefault("success", False)
+            result["success"] = False
             result.setdefault("status", e.code)
             return result
         except urllib.error.URLError as e:
@@ -490,14 +491,21 @@ class AgentAndroidClient:
         self,
         snapshot_elem: Dict[str, Any],
         elements: List[Dict[str, Any]],
+        *,
+        snapshot_peers: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[Dict[str, Any]]:
         wanted = self._element_identity(snapshot_elem)
         if not any(part for part in wanted):
             return None
-        for elem in elements:
-            if self._element_identity(elem) == wanted:
-                return elem
-        return None
+        matches = [elem for elem in elements if self._element_identity(elem) == wanted]
+        snapshot_count = sum(
+            self._element_identity(peer) == wanted for peer in (snapshot_peers or []) if isinstance(peer, dict)
+        )
+        # A refresh may omit all but one of several identical rows.
+        if len(matches) > 1 or snapshot_count > 1:
+            bounds = snapshot_elem.get("bounds")
+            matches = [elem for elem in matches if bounds and elem.get("bounds") == bounds]
+        return matches[0] if len(matches) == 1 else None
 
     def _resolve_action_target(self, refId: int) -> Optional[Dict[str, Any]]:
         if self._local_tree:
@@ -528,9 +536,14 @@ class AgentAndroidClient:
 
                 current_tree = self.get_ui_elements(force_refresh=True)
                 if current_tree:
-                    matched = self._find_matching_snapshot_identity(snapshot_elem, current_tree)
+                    matched = self._find_matching_snapshot_identity(
+                        snapshot_elem, current_tree, snapshot_peers=snapshot["elements"]
+                    )
                     if matched is not None:
                         return matched
+                # A refresh may replace _snapshot even when the target still
+                # comes from the saved snapshot.
+                self._snapshot = snapshot
                 return snapshot_elem
 
         return self._find_element_by_refId(refId, force_refresh=True)
@@ -542,13 +555,82 @@ class AgentAndroidClient:
         """Execute an operation and print a consistent success/failure message."""
         result = self._execute_single_operation(template_id, operation_type, parameters)
         if result and result.get('success'):
-            print(success_message)
             self._invalidate_ui_state_cache()
+            self._record_action(result, operation_type, parameters or {})
+            print(success_message)
             return True
 
         msg = result.get('errorMessage', 'Unknown error') if result else 'no response'
         print(f"{failure_prefix}: {msg}")
         return False
+
+    def _record_action(self, result: Optional[Dict[str, Any]], operation_type: str,
+                       parameters: Dict[str, Any]) -> None:
+        if self.action_session is not None and result and result.get("success") is True:
+            try:
+                self.action_session.append(operation_type, parameters)
+            except Exception as exc:
+                print("Warning: phone action succeeded but could not be recorded locally.", file=sys.stderr)
+                traceback.print_exception(type(exc), exc, None, file=sys.stderr)
+
+    def _target_locator(self, target: Dict[str, Any], *, use_text: bool = True) -> Dict[str, Any]:
+        # Use the list that supplied this target, even if a refresh cached
+        # a different list while resolving the refId.
+        peers = self._local_tree or []
+        if not any(peer is target for peer in peers):
+            peers = (self._snapshot or {}).get("elements") or []
+            if not any(peer is target for peer in peers):
+                return {}
+
+        bounds = target.get("bounds")
+        if not self._parse_bounds_string(bounds or ""):
+            return {}
+        root = self._get_ui_tree_root(visible_only=False)
+        if root is None:
+            return {}
+
+        attributes = [("resourceId", "resource-id"), ("contentDesc", "content-desc")]
+        if use_text and not target.get("editable") and target.get("simpleClassName") not in {
+            "EditText", "AutoCompleteTextView", "TextInputEditText",
+        }:
+            attributes.append(("text", "text"))
+        for key, attribute in attributes:
+            value = target.get(key)
+            if not value or ('"' in value and "'" in value) or "${" in value:
+                continue
+            # XPath @text uses the description when the node has no text.
+            peer_matches = [
+                peer for peer in peers if isinstance(peer, dict)
+                and (peer.get(key) or (peer.get("contentDesc") if key == "text" else None)) == value
+            ]
+            matches = [
+                node for node in root.iter("node")
+                if (node.get(attribute) or (node.get("content-desc") if key == "text" else None)) == value
+            ]
+            if len(peer_matches) == len(matches) == 1 and matches[0].get("bounds") == bounds:
+                if key == "resourceId":
+                    return {"id": value}
+                return {"xpath": f"//*[@{attribute}={self._escape_xpath_value(value)}]"}
+            break
+
+        # The ARIA list omits some siblings and is visually sorted. Use XML
+        # positions without embedding a field's current value.
+        node = self._find_matching_xml_node(target, root)
+        if node is None or node.get("bounds") != bounds:
+            return {}
+
+        parents = self._build_xml_parent_map(root)
+        segments = []
+        while node is not None and node.tag == "node":
+            parent = parents[id(node)]
+            cls = self._xml_short_class(node)
+            if not cls:
+                return {}
+            siblings = list(parent) if parent is not None else [node]
+            same_class = [sibling for sibling in siblings if self._xml_short_class(sibling) == cls]
+            segments.append(f"{cls}[{same_class.index(node) + 1}]")
+            node = parent
+        return {"xpath": "/hierarchy/" + "/".join(reversed(segments))}
 
     def _get_coordinates(self, elem: Dict[str, Any], label: str
                          ) -> Optional[Tuple[Any, Any]]:
@@ -941,16 +1023,23 @@ class AgentAndroidClient:
         if not target:
             return False
 
-        coords = self._get_coordinates(target, f"Element refId={refId}")
-        if not coords:
-            return False
-        x, y = coords
+        locator = self._target_locator(target)
+        if locator:
+            parameters = {"mode": "locator", **locator}
+            message = f"Tapped refId={refId}"
+        else:
+            coords = self._get_coordinates(target, f"Element refId={refId}")
+            if not coords:
+                return False
+            x, y = coords
+            parameters = {"mode": "coordinate", "x": x, "y": y}
+            message = f"Tapped refId={refId} at ({x}, {y})"
 
         return self._run_single_operation(
             template_id=f"tap-refId-{refId}",
             operation_type="android.touch.tap",
-            parameters={"mode": "coordinate", "x": x, "y": y},
-            success_message=f"Tapped refId={refId} at ({x}, {y})",
+            parameters=parameters,
+            success_message=message,
             failure_prefix="Tap failed"
         )
 
@@ -971,28 +1060,29 @@ class AgentAndroidClient:
             )
             return False
 
-        elem_desc = target.get('text') or target.get('contentDesc') or f"refId={refId}"
-        coords = self._get_coordinates(target, f"Element refId={refId}")
-        if not coords:
+        locator = self._target_locator(target, use_text=False)
+        if not locator:
+            print(
+                f"Input failed: no locator for refId={refId}. Refresh the UI tree or use an explicit XPath.",
+                file=sys.stderr,
+            )
             return False
-        x, y = coords
 
         action = "Clearing" if clearFirst and text == "" else "Inputting"
-        print(f"{action} '{text}' to '{elem_desc}' (refId={refId}) at ({x}, {y})")
+        print(f"{action} text for refId={refId}")
 
         return self._run_single_operation(
             template_id=f"input-refId-{refId}",
             operation_type="android.element.input",
             parameters={
-                "x": x,
-                "y": y,
+                **locator,
                 "value": text,
                 "clearFirst": clearFirst
             },
             success_message=(
                 f"SUCCESS: Cleared element refId={refId}"
                 if clearFirst and text == ""
-                else f"SUCCESS: Input '{text}' to element refId={refId}"
+                else f"SUCCESS: Input text to element refId={refId}"
             ),
             failure_prefix="FAILED"
         )
@@ -1286,8 +1376,9 @@ class AgentAndroidClient:
 
         result = self._api_call(template)
         if result and result.get('success'):
-            print(f"Pressed: {key}")
             self._invalidate_ui_state_cache()
+            self._record_action(result, op_type, {})
+            print(f"Pressed: {key}")
             return True
 
         msg = result.get('errorMessage', 'Unknown') if result else 'no response'
@@ -1374,19 +1465,25 @@ class AgentAndroidClient:
             }
         self.last_launch_result = details
         self._invalidate_ui_state_cache()
+        launched = details["status"] == "launched" and details.get("launched") is True
+        if launched:
+            replay_parameters = dict(parameters, selectionHandling="fail")
+            replay_parameters.pop("outputVariable", None)
+            self._record_action(result, "android.app.launch", replay_parameters)
         if raw:
             print(json.dumps(details, ensure_ascii=False))
-        elif details["status"] == "launched" and details.get("launched") is True:
+        elif launched:
             print(f"Launched: {package}")
         elif details["status"] == "selection_required":
             print(f"selection_required: {details.get('message', 'Choose an app instance.')}")
             for choice in details.get("choices", []):
                 print(f"  [{choice['index']}] {choice.get('label', '')}")
-            print(f"Continue: agent-android --url {self.base_url} --launch {package} --launch-choice N")
+            session_flag = f" --session {self.action_session.name}" if self.action_session else ""
+            print(f"Continue: agent-android --url {self.base_url}{session_flag} --launch {package} --launch-choice N")
             print("Indices refer to the current visible chooser; they do not identify original/clone accounts.")
         else:
             print(f"Launch failed: {details.get('message', 'Unknown error')}")
-        return details.get("status") == "launched" and details.get("launched") is True
+        return launched
 
     def press_back(self) -> bool:
         return self._run_single_operation(
@@ -2832,7 +2929,7 @@ class AgentAndroidClient:
             success_message=(
                 f"Cleared XPath [{xpath}]"
                 if text == ""
-                else f"Input '{text}' to XPath [{xpath}]"
+                else f"Input text to XPath [{xpath}]"
             ),
             failure_prefix="FAILED"
         )

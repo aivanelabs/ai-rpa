@@ -3,13 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
+import traceback
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import __version__
 from .client import AgentAndroidClient
 from .config import TOKEN_ENV_VAR, require_base_url, resolve_api_token
 from .formatting import print_tree
+from .recording import DEFAULT_SESSION, ActionSession
 from .repl import AriaReplSession
 
 EPILOG = """AIVane Android REPL CLI helper for agent-android.
@@ -30,6 +34,8 @@ One-off examples:
     agent-android --launch com.example.app --launch-choice 2 --url http://<device-ip>:8080
     agent-android --tap 7 --url http://<device-ip>:8080
     agent-android --input 7 "hello world" --url http://<device-ip>:8080
+    agent-android save <dir> --url http://<device-ip>:8080 --session default
+    agent-android session clear --url http://<device-ip>:8080 --session default
     agent-android --template template.json --url http://<device-ip>:8080
     agent-android --template template.json --async --url http://<device-ip>:8080
     agent-android --application-bundle app.zip --main-template-file __main__.json --url http://<device-ip>:8080
@@ -99,6 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--repl", "-i", action="store_true", help="Enter REPL interactive mode (recommended)")
     parser.add_argument("--url", "-u", default=None, help="AIVane server URL (command-line overrides saved config)")
+    parser.add_argument("--session", default=DEFAULT_SESSION, help="Local action session name (default: default)")
     parser.add_argument("--token", default=None, help=f"Shared token for protected device access. Overrides {TOKEN_ENV_VAR} and saved config.")
     parser.add_argument("--wait", "-w", type=int, default=0, help="Wait N seconds before fetching ARIA tree")
     parser.add_argument("--no-cache", action="store_true", help="Force refresh ARIA tree (bypass cache)")
@@ -448,9 +455,58 @@ def _handle_tree_queries(
             print_tree(results, args.filter, client.get_current_package_name())
 
 
+def _run_local_command(command: str, argv: List[str]) -> int:
+    description = {
+        "save": "Save and lint an Android Application locally.",
+        "session": "Manage the local Android action session.",
+    }
+    parser = argparse.ArgumentParser(prog=f"agent-android {command}", description=description[command])
+    if command == "save":
+        parser.add_argument("directory", type=Path, metavar="DIR")
+    else:
+        parser.add_argument("action", choices=["clear"], help="Clear the recorded actions in this session")
+    parser.add_argument("--url", "-u", help="Phone URL used during recording (defaults to saved URL)")
+    parser.add_argument("--session", default=DEFAULT_SESSION, help="Local action session name (default: default)")
+    parser.add_argument("--token", help=argparse.SUPPRESS)  # Local commands do not contact the phone.
+    args = parser.parse_args(argv)
+    try:
+        session = ActionSession(require_base_url(args.url), args.session)
+        if command == "session":
+            session.clear()
+            print(f"Cleared action session {session.name!r}")
+            return 0
+        zip_path = session.save(args.directory)
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        label = "Save" if command == "save" else "Session clear"
+        print(f"{label} failed:", file=sys.stderr)
+        traceback.print_exception(type(exc), exc, None, file=sys.stderr)
+        return 1
+    print(f"Saved Application directory {zip_path.with_suffix('')} and ZIP {zip_path}")
+    return 0
+
+
+def _local_command_index(argv: List[str]) -> int:
+    # Skip only leading connection options and their values. A value of "save"
+    # or "session" must not select a command.
+    index = 0
+    while index < len(argv):
+        option = argv[index]
+        if option in ("--url", "-u", "--session", "--token"):
+            index += 2
+        elif option.startswith(("--url=", "--session=", "--token=", "-u")):
+            index += 1
+        else:
+            break
+    return index
+
+
 def main() -> int:
+    argv = sys.argv[1:]
+    index = _local_command_index(argv)
+    if index < len(argv) and argv[index] in ("save", "session"):
+        return _run_local_command(argv[index], argv[:index] + argv[index + 1:])
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.match_index is not None and not args.validate_xpath:
         parser.error("--match-index requires --validate-xpath")
     if args.ui_tree_all and args.ui_tree is None:
@@ -486,15 +542,21 @@ def main() -> int:
     if args.execute_timeout <= 0:
         parser.error("--execute-timeout must be positive")
     url = require_base_url(args.url)
+    try:
+        action_session = ActionSession(url, args.session)
+    except ValueError as exc:
+        parser.error(f"{type(exc).__name__}: {exc}")
     token = resolve_api_token(args.token)
 
     if args.repl:
         history_path = os.path.expanduser("~/.agent-android-history")
         session = AriaReplSession(url=url, token=token, history_file=history_path)
+        session.client.action_session = action_session
         session.run()
         return 0
 
     client = AgentAndroidClient(url, token=token)
+    client.action_session = action_session
     _run_direct_commands(args, client)
     _run_wait_command(args, client)
 

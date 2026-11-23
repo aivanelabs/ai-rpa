@@ -8,7 +8,7 @@ import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 from .client import AgentAndroidClient
-from .config import CONFIG_FILE_PATH, save_token_to_config, save_url_to_config
+from .config import CONFIG_FILE_PATH, normalize_base_url, save_token_to_config, save_url_to_config
 from .formatting import (
     _format_launcher_app,
     format_detail_card,
@@ -16,6 +16,7 @@ from .formatting import (
     format_status,
     print_tree,
 )
+from .recording import ActionSession
 
 try:
     import readline
@@ -318,17 +319,15 @@ class AriaReplSession:
     # -------------------------------------------------------------------------
 
     def _readline(self) -> Optional[str]:
-        if _HAS_READLINE:
+        if not _HAS_READLINE:
             return input(self._prompt)
-        else:
-            return input(self._prompt)
-
-    def _add_history(self, line: str):
-        if _HAS_READLINE:
-            try:
-                readline.add_history(line)
-            except Exception:
-                pass
+        history_length = readline.get_current_history_length()
+        line = input(self._prompt)
+        words = line.split(maxsplit=2)
+        if words and (words[0] in ("i", "input", "ix", "inputx") or words[:2] == ["set", "token"]):
+            if readline.get_current_history_length() > history_length:
+                readline.remove_history_item(history_length)
+        return line
 
     def _save_history(self):
         if _HAS_READLINE and hasattr(self, '_history_file'):
@@ -1270,6 +1269,9 @@ class AriaReplSession:
         """vars - show session variables."""
         print("  Session:")
         print(f"    URL:      {self.client.base_url}")
+        recording = getattr(self.client, "action_session", None)
+        if recording is not None:
+            print(f"    Record:   {recording.name}")
         print(f"    Token:    {'SET' if self.client.token else 'NOT SET'}")
         print(f"    Timeout:  {self._timeout}s")
         print(f"    RawJSON:  {'ON' if self._raw_output else 'OFF'}")
@@ -1277,6 +1279,14 @@ class AriaReplSession:
         if self._tree:
             print(f"    Elements: {len(self._tree)}")
         return True
+
+    def _replace_client(self, url: str, token: Optional[str]) -> None:
+        client = AgentAndroidClient(url, token=token)
+        recording = getattr(self.client, "action_session", None)
+        if recording is not None:
+            client.action_session = ActionSession(url, recording.name)
+        self.client = client
+        self._invalidate_tree()
 
     def _cmd_set(self, args: List[str]) -> bool:
         """set <url|token|timeout> <value> - set a session variable."""
@@ -1289,10 +1299,15 @@ class AriaReplSession:
             if not trimmed_value:
                 self._print_error("URL cannot be empty")
                 return False
-            self.client = AgentAndroidClient(trimmed_value, token=self.client.token)
-            print(f"  URL set to: {trimmed_value}")
             try:
-                save_url_to_config(trimmed_value)
+                url = normalize_base_url(trimmed_value)
+                self._replace_client(url, self.client.token)
+            except ValueError as exc:
+                self._print_error(f"Invalid URL: {type(exc).__name__}: {exc}")
+                return False
+            print(f"  URL set to: {url}")
+            try:
+                save_url_to_config(url)
                 print(f"  Persisted to {CONFIG_FILE_PATH}")
             except OSError as exc:
                 print(f"  Warning: could not save URL to {CONFIG_FILE_PATH}: {exc}", file=sys.stderr)
@@ -1300,7 +1315,7 @@ class AriaReplSession:
             decoded = self._decode_input_payload(value.strip())
             normalized = decoded.strip()
             token = normalized or None
-            self.client = AgentAndroidClient(self.client.base_url, token=token)
+            self._replace_client(self.client.base_url, token)
             if token:
                 print("  Token set for protected API access")
             else:

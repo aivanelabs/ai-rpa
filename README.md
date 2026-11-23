@@ -50,6 +50,30 @@ agent-android --health --url http://<device-ip>:8080
 
 Full guide with demos, quickstart, REPL commands, template upload and validation: [docs/android/README.md](docs/android/README.md).
 
+### Save an Android Application
+
+Use the same phone endpoint URL and `--session` name for one-off commands, the REPL, and `save`. The endpoint URL identifies the device for recording. If a phone's address changes, it has a separate recording. A different phone at the same URL shares that recording. Omit `--session` to use `default`, or choose a new name to start a separate recording.
+
+Install the linter from this checkout so `save` has the bundled schemas for `android.press.enter`, `android.touch.drag`, and `android.touch.longPress`. These schemas are missing from PyPI release 0.1.1. Run the install in your active Python environment with its scripts directory on `PATH`.
+
+```bash
+python -m pip install -e clients/template-linter
+agent-android --launch com.example.app --url http://<device-ip>:8080 --session demo
+agent-android --repl --url http://<device-ip>:8080 --session demo
+# In the REPL, use l to find a field, i <refId> <text> to type, and q to exit.
+agent-android save demo-app --url http://<device-ip>:8080 --session demo
+```
+
+Successful interactive UI actions are recorded on the controlling machine. Inspections and failed actions are omitted. `save` runs the local linter and writes `demo-app/` and `demo-app.zip` after a successful export. Entered text becomes required replay inputs such as `input_1`. Tap locators can contain the tapped element's visible text or accessibility description, which is stored in the recording and export. Recording and export require only the CLI, phone API, and local linter. No AIVane server, desktop app, or Business account is required.
+
+To discard the recorded actions for this endpoint and session, run `agent-android session clear --url http://<device-ip>:8080 --session demo`. Use an explicit session name to select the recording you want to clear.
+
+On an Android APK with the `/executeApplication` binding fix, replay the ZIP with replacement input values:
+
+```bash
+agent-android --application-bundle demo-app.zip --url http://<device-ip>:8080 --variables '{"input_1":"new text"}'
+```
+
 ## Repository layout
 
 | Path | Contents |
@@ -63,6 +87,13 @@ Full guide with demos, quickstart, REPL commands, template upload and validation
 | `aivane.apk` | Android REPL beta APK build (releases are on [GitHub Releases](https://github.com/aivanelabs/ai-rpa/releases)) |
 
 ## Contributing, security, license
+
+Run both Python unit suites from the repository root in an active Python 3.11+ virtual environment.
+
+```bash
+python -m pip install pytest -e clients/python -e clients/template-linter
+pytest -m "not device"
+```
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)
