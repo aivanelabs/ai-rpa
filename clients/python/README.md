@@ -57,6 +57,20 @@ agent-android --upload foo.json --remote-path Templates/foo.json --no-overwrite 
 
 `--upload` overwrites by default. It uses the same phone-side token check as the other protected REPL endpoints.
 
+## Save to the account library
+
+Install the template linter and leave `aivane-template-lint` on your `PATH`. Record the actions you want to save and run the following commands.
+
+```bash
+agent-android sign-in --url https://account.example.com
+agent-android save demo-app --upload --url http://<device-ip>:8080 --session demo
+agent-android sign-out
+```
+
+Use your account server's HTTPS origin for `sign-in` and approve access in the system browser. The `--url` on `save` selects the phone endpoint you used while recording. The access and refresh tokens are kept in Windows Credential Manager or a user-only session file on other systems.
+
+The CLI saves and lints locally before uploading the ZIP and printing the library automation and revision IDs. Plain `save DIR` works offline. If the upload fails, keep the local directory and ZIP and repeat the same upload command. The CLI refreshes expired access tokens automatically. If the session can no longer be refreshed, run `agent-android sign-in` with the same account and workspace before retrying. Leave the ZIP bytes unchanged so the CLI can resume the original upload. `sign-out` revokes the current device session and clears its stored credentials.
+
 ## App launch and dual apps
 
 App launch requires a phone-side AIVane build with structured chooser handling.
